@@ -42,6 +42,7 @@ def split_dataset(annotation_path: str, split_path: str):
     for scene in folders:
         data = COCO(
             os.path.join(annotation_path, scene, 'keypoint_annotation.json'))
+        progress_bar = mmengine.ProgressBar(len(data.anns.keys()))
         for aid in data.anns.keys():
             ann = data.anns[aid]
             img = data.loadImgs(ann['image_id'])[0]
@@ -53,7 +54,7 @@ def split_dataset(annotation_path: str, split_path: str):
             video_name = file_name.split('/')[-2]
             if 'Trim' in video_name:
                 video_name = video_name.split('_Trim')[0]
-
+            img['file_name'] = os.path.join(scene, file_name)
             if video_name in splits:
                 val_imgs.append(img)
                 ann['image_id'] = v_id
@@ -64,6 +65,7 @@ def split_dataset(annotation_path: str, split_path: str):
                 ann['image_id'] = t_id
                 train_annos.append(ann)
                 t_id += 1
+            progress_bar.update()
 
     categories = [{'supercategory': 'person', 'id': 1, 'name': 'person'}]
 
