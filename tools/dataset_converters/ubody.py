@@ -64,8 +64,13 @@ def split_dataset(annotation_path: str, split_path: str):
                 ann['image_id'] = t_id
                 train_annos.append(ann)
                 t_id += 1
-    train_data = dict(images=train_imgs, annotations=train_annos)
-    val_data = dict(images=val_imgs, annotations=val_annos)
+
+    categories = [{'supercategory': 'person', 'id': 1, 'name': 'person'}]
+
+    train_data = dict(
+        images=train_imgs, annotations=train_annos, categories=categories)
+    val_data = dict(
+        images=val_imgs, annotations=val_annos, categories=categories)
 
     mmengine.dump(train_data,
                   os.path.join(annotation_path, 'train_annotation.json'))
