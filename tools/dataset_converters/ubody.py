@@ -1,11 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import os
-from multiprocessing import Pool
 
 import mmengine
 import numpy as np
 from pycocotools.coco import COCO
+
+# from multiprocessing import Pool
 
 
 def findAllFile(base):
@@ -37,8 +38,8 @@ def split_dataset(annotation_path: str, split_path: str):
     val_annos = []
     train_imgs = []
     val_imgs = []
-    t_id = 0
-    v_id = 0
+    # t_id = 0
+    # v_id = 0
     for scene in folders:
         data = COCO(
             os.path.join(annotation_path, scene, 'keypoint_annotation.json'))
@@ -54,18 +55,27 @@ def split_dataset(annotation_path: str, split_path: str):
             video_name = file_name.split('/')[-2]
             if 'Trim' in video_name:
                 video_name = video_name.split('_Trim')[0]
+
+            img_path = os.path.join(
+                annotation_path.replace('annotations', 'images'), scene,
+                file_name)
+            if not os.path.exists(img_path):
+                progress_bar.update()
+                continue
+
             img['file_name'] = os.path.join(scene, file_name)
             if video_name in splits:
                 val_imgs.append(img)
-                ann['image_id'] = v_id
+                # ann['image_id'] = v_id
                 val_annos.append(ann)
-                v_id += 1
+                # v_id += 1
             else:
                 train_imgs.append(img)
-                ann['image_id'] = t_id
+                # ann['image_id'] = t_id
                 train_annos.append(ann)
-                t_id += 1
+                # t_id += 1
             progress_bar.update()
+        break
 
     categories = [{'supercategory': 'person', 'id': 1, 'name': 'person'}]
 
@@ -88,10 +98,10 @@ if __name__ == '__main__':
     split_path = f'{args.data_root}/splits/intra_scene_test_list.npy'
     annotation_path = f'{args.data_root}/annotations'
 
-    video_paths = findAllFile(video_root)
-    pool = Pool(processes=1)
-    pool.map(convert, video_paths)
-    pool.close()
-    pool.join()
+    # video_paths = findAllFile(video_root)
+    # pool = Pool(processes=1)
+    # pool.map(convert, video_paths)
+    # pool.close()
+    # pool.join()
 
     split_dataset(annotation_path, split_path)
