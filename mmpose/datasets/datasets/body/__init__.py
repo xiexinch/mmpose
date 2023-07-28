@@ -10,7 +10,6 @@ from .mpii_trb_dataset import MpiiTrbDataset
 from .ochuman_dataset import OCHumanDataset
 from .posetrack18_dataset import PoseTrack18Dataset
 from .posetrack18_video_dataset import PoseTrack18VideoDataset
-from .ubody2d_dataset import UBody2dDataset
 
 __all__ = [
     'CocoDataset', 'MpiiDataset', 'MpiiTrbDataset', 'AicDataset',

@@ -1,12 +1,12 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import argparse
 import os
+from copy import deepcopy
+from multiprocessing import Pool
 
 import mmengine
 import numpy as np
 from pycocotools.coco import COCO
-
-# from multiprocessing import Pool
 
 
 def findAllFile(base):
@@ -38,9 +38,15 @@ def split_dataset(annotation_path: str, split_path: str):
     val_annos = []
     train_imgs = []
     val_imgs = []
-    # t_id = 0
-    # v_id = 0
+    t_id = 0
+    v_id = 0
+    categories = [{'supercategory': 'person', 'id': 1, 'name': 'person'}]
+
     for scene in folders:
+        scene_train_anns = []
+        scene_val_anns = []
+        scene_train_imgs = []
+        scene_val_imgs = []
         data = COCO(
             os.path.join(annotation_path, scene, 'keypoint_annotation.json'))
         progress_bar = mmengine.ProgressBar(len(data.anns.keys()))
@@ -65,19 +71,41 @@ def split_dataset(annotation_path: str, split_path: str):
 
             img['file_name'] = os.path.join(scene, file_name)
             if video_name in splits:
+                scene_val_anns.append(ann)
+                scene_val_imgs.append(img)
+                ann_ = deepcopy(ann)
+                ann_['id'] = v_id
+                ann_['image_id'] = v_id
+                val_annos.append(ann_)
                 val_imgs.append(img)
-                # ann['image_id'] = v_id
-                val_annos.append(ann)
-                # v_id += 1
+                v_id += 1
             else:
+                scene_train_anns.append(ann)
+                scene_train_imgs.append(img)
+                ann_ = deepcopy(ann)
+                ann_['id'] = t_id
+                ann_['image_id'] = t_id
+                train_annos.append(ann_)
                 train_imgs.append(img)
-                # ann['image_id'] = t_id
-                train_annos.append(ann)
-                # t_id += 1
-            progress_bar.update()
-        break
+                t_id += 1
 
-    categories = [{'supercategory': 'person', 'id': 1, 'name': 'person'}]
+            progress_bar.update()
+
+        scene_train_data = dict(
+            images=scene_train_imgs,
+            annotations=scene_train_anns,
+            categories=categories)
+        scene_val_data = dict(
+            images=scene_val_imgs,
+            annotations=scene_val_anns,
+            categories=categories)
+
+        mmengine.dump(
+            scene_train_data,
+            os.path.join(annotation_path, scene, 'train_annotations.json'))
+        mmengine.dump(
+            scene_val_data,
+            os.path.join(annotation_path, scene, 'val_annotations.json'))
 
     train_data = dict(
         images=train_imgs, annotations=train_annos, categories=categories)
@@ -98,10 +126,10 @@ if __name__ == '__main__':
     split_path = f'{args.data_root}/splits/intra_scene_test_list.npy'
     annotation_path = f'{args.data_root}/annotations'
 
-    # video_paths = findAllFile(video_root)
-    # pool = Pool(processes=1)
-    # pool.map(convert, video_paths)
-    # pool.close()
-    # pool.join()
+    video_paths = findAllFile(video_root)
+    pool = Pool(processes=1)
+    pool.map(convert, video_paths)
+    pool.close()
+    pool.join()
 
     split_dataset(annotation_path, split_path)
