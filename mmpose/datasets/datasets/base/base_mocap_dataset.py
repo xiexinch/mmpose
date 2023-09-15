@@ -97,7 +97,11 @@ class BaseMocapDataset(BaseDataset):
             f'Annotation file `{_ann_file}` does not exist.')
 
         with get_local_path(_ann_file) as local_path:
-            self.ann_data = np.load(local_path)
+            file_format = local_path.split('.')[-1]
+            if file_format in ['npz', 'npy']:
+                self.ann_data = np.load(local_path)
+            else:
+                self.ann_data = load(local_path)
 
         self.camera_param_file = camera_param_file
         if self.camera_param_file:
