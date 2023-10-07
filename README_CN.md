@@ -19,12 +19,13 @@
   <div>&nbsp;</div>
 
 [![Documentation](https://readthedocs.org/projects/mmpose/badge/?version=latest)](https://mmpose.readthedocs.io/en/latest/?badge=latest)
-[![actions](https://github.com/open-mmlab/mmpose/workflows/build/badge.svg)](https://github.com/open-mmlab/mmpose/actions)
+[![actions](https://github.com/open-mmlab/mmpose/workflows/merge_stage_test/badge.svg)](https://github.com/open-mmlab/mmpose/actions)
 [![codecov](https://codecov.io/gh/open-mmlab/mmpose/branch/latest/graph/badge.svg)](https://codecov.io/gh/open-mmlab/mmpose)
 [![PyPI](https://img.shields.io/pypi/v/mmpose)](https://pypi.org/project/mmpose/)
 [![LICENSE](https://img.shields.io/github/license/open-mmlab/mmpose.svg)](https://github.com/open-mmlab/mmpose/blob/main/LICENSE)
 [![Average time to resolve an issue](https://isitmaintained.com/badge/resolution/open-mmlab/mmpose.svg)](https://github.com/open-mmlab/mmpose/issues)
 [![Percentage of issues still open](https://isitmaintained.com/badge/open/open-mmlab/mmpose.svg)](https://github.com/open-mmlab/mmpose/issues)
+[![Open in OpenXLab](https://cdn-static.openxlab.org.cn/app-center/openxlab_demo.svg)](https://openxlab.org.cn/apps?search=mmpose)
 
 [📘文档](https://mmpose.readthedocs.io/zh_CN/latest/) |
 [🛠️安装](https://mmpose.readthedocs.io/zh_CN/latest/installation.html) |
