@@ -221,6 +221,7 @@ def process_one_image(args, detector, frame, frame_idx, pose_estimator,
 
     # estimate pose results for current image
     pose_est_results = inference_topdown(pose_estimator, frame, bboxes)
+    print(pose_est_results)
 
     if args.use_oks_tracking:
         _track = partial(_track_by_oks)
@@ -337,6 +338,7 @@ def process_one_image(args, detector, frame, frame_idx, pose_estimator,
     pred_3d_data_samples = merge_data_samples(pose_lift_results)
     det_data_sample = merge_data_samples(pose_est_results)
     pred_3d_instances = pred_3d_data_samples.get('pred_instances', None)
+    print(pred_3d_instances)
 
     if args.num_instances < 0:
         args.num_instances = len(pose_lift_results)

@@ -251,6 +251,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             else:
                 keypoints_visible = np.ones(keypoints.shape[:-1])
 
+            # pred_img_data = draw_skeleton(keypoints, plt_show=False)
+
             _draw_3d_instances_kpts(keypoints, scores, scores_2d,
                                     keypoints_visible, 1, show_kpt_idx,
                                     'Prediction')
@@ -289,7 +291,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
 
         pred_img_data = fig.canvas.tostring_rgb()
         pred_img_data = np.frombuffer(
-            fig.canvas.tostring_rgb(), dtype=np.uint8)
+            fig.canvas.tostring_rgb(), dtype=np.uint32).astype(np.uint8)
 
         if not pred_img_data.any():
             pred_img_data = np.full((vis_height, vis_width, 3), 255)
@@ -297,7 +299,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             pred_img_data = pred_img_data.reshape(vis_height,
                                                   vis_width * num_instances,
                                                   -1)
-
+        plt.show()
         plt.close(fig)
 
         return pred_img_data

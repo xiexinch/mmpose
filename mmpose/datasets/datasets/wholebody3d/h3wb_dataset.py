@@ -240,9 +240,13 @@ class H36MWholeBodyDataset(Human36mDataset):
         """Get 2D keypoints and 3D keypoints from annotation."""
         kpts = ann['keypoints_3d']
         kpts_2d = ann_2d['keypoints_2d']
-        kpts_3d = np.array([[v for _, v in joint.items()]
-                            for _, joint in kpts.items()],
-                           dtype=np.float32).reshape(1, -1, 3)
+        # kpts_3d = np.array([[v for _, v in joint.items()]
+        #                     for _, joint in kpts.items()],
+        #                    dtype=np.float32).reshape(1, -1, 3)
+        # swap y and z, then invert z
+        # ref https://github.com/wholebody3d/wholebody3d/blob/main/utils/utils.py#L183 # noqa
+        kpts_3d = np.array([[joint['x'], joint['z'], -joint['y']]
+                            for _, joint in kpts.items()], )
         kpts_2d = np.array([[v for _, v in joint.items()]
                             for _, joint in kpts_2d.items()],
                            dtype=np.float32).reshape(1, -1, 2)
