@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -50,9 +50,14 @@ class ImagePoseLifting(BaseKeypointCodec):
         lifting_target_label='lifting_target_label',
         lifting_target_weight='lifting_target_weight')
 
+    keypoints_stats_keys = {
+        'keypoints_2d_std', 'keypoints_2d_mean', 'keypoints_3d_std',
+        'keypoints_3d_mean'
+    }
+
     def __init__(self,
                  num_keypoints: int,
-                 root_index: int,
+                 root_index: Union[int, List] = 0,
                  remove_root: bool = False,
                  save_index: bool = False,
                  reshape_keypoints: bool = True,
@@ -60,10 +65,15 @@ class ImagePoseLifting(BaseKeypointCodec):
                  keypoints_mean: Optional[np.ndarray] = None,
                  keypoints_std: Optional[np.ndarray] = None,
                  target_mean: Optional[np.ndarray] = None,
-                 target_std: Optional[np.ndarray] = None):
+                 target_std: Optional[np.ndarray] = None,
+                 normalize_target: bool = False,
+                 auxiliary_encode_keys: Optional[List[str]] = None,
+                 keypoints_stats_keys: Optional[dict] = None):
         super().__init__()
 
         self.num_keypoints = num_keypoints
+        if isinstance(root_index, int):
+            root_index = [root_index]
         self.root_index = root_index
         self.remove_root = remove_root
         self.save_index = save_index
@@ -95,12 +105,19 @@ class ImagePoseLifting(BaseKeypointCodec):
         self.keypoints_std = keypoints_std
         self.target_mean = target_mean
         self.target_std = target_std
+        self.normalize_target = normalize_target
+        if auxiliary_encode_keys is not None:
+            for key in auxiliary_encode_keys:
+                self.auxiliary_encode_keys.add(key)
+        if keypoints_stats_keys is not None:
+            self.keypoints_stats_keys = keypoints_stats_keys
 
     def encode(self,
                keypoints: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None,
                lifting_target: Optional[np.ndarray] = None,
-               lifting_target_visible: Optional[np.ndarray] = None) -> dict:
+               lifting_target_visible: Optional[np.ndarray] = None,
+               keypoints_stats_info: Optional[dict] = None) -> dict:
         """Encoding keypoints from input image space to normalized space.
 
         Args:
@@ -161,12 +178,12 @@ class ImagePoseLifting(BaseKeypointCodec):
 
         # Zero-center the target pose around a given root keypoint
         assert (lifting_target.ndim >= 2 and
-                lifting_target.shape[-2] > self.root_index), \
+                lifting_target.shape[-2] > max(self.root_index)), \
             f'Got invalid joint shape {lifting_target.shape}'
 
-        root = lifting_target[..., self.root_index, :]
-        lifting_target_label = lifting_target - lifting_target[
-            ..., self.root_index:self.root_index + 1, :]
+        root = np.mean(
+            lifting_target[..., self.root_index, :], axis=-2, dtype=np.float32)
+        lifting_target_label = lifting_target - root[np.newaxis, ...]
 
         if self.remove_root:
             lifting_target_label = np.delete(
@@ -209,6 +226,18 @@ class ImagePoseLifting(BaseKeypointCodec):
 
             lifting_target_label = (lifting_target_label -
                                     self.target_mean) / self.target_std
+
+        if keypoints_stats_info is not None:
+            assert set(
+                keypoints_stats_info.keys()) == self.keypoints_stats_keys
+            keypoints_std = keypoints_stats_info['keypoints_2d_std']
+            keypoints_mean = keypoints_stats_info['keypoints_2d_mean']
+            target_std = keypoints_stats_info['keypoints_3d_std']
+            target_mean = keypoints_stats_info['keypoints_3d_mean']
+            keypoint_labels = ((keypoint_labels - keypoints_mean) /
+                               keypoints_std).astype(np.float32)
+            lifting_target_label = ((lifting_target_label - target_mean) /
+                                    target_std).astype(np.float32)
 
         # Generate reshaped keypoint coordinates
         assert keypoint_labels.ndim in {

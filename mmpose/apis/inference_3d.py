@@ -255,6 +255,8 @@ def inference_pose_lifter_model(model,
     """
     init_default_scope(model.cfg.get('default_scope', 'mmpose'))
     pipeline = Compose(model.cfg.test_dataloader.dataset.pipeline)
+    # print(pipeline.transforms[0].encoder.auxiliary_encode_keys)
+    # raise '123'
 
     causal = model.cfg.test_dataloader.dataset.get('causal', False)
     target_idx = -1 if causal else len(pose_results_2d) // 2

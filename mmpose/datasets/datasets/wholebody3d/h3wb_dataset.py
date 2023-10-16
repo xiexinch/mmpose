@@ -168,6 +168,14 @@ class H36MWholeBodyDataset(Human36mDataset):
         kpts_3d = np.concatenate(kpts_3d, axis=0)
         kpts_2d = np.concatenate(kpts_2d, axis=0)
         kpts_visible = np.ones_like(kpts_2d[..., 0], dtype=np.float32)
+        kpts_2d_std, kpts_2d_mean = kpts_2d.std(axis=0), kpts_2d.std(axis=0)
+        kpts_3d_std, kpts_3d_mean = kpts_3d.std(axis=0), kpts_3d.std(axis=0)
+
+        keypoints_stats_info = dict(
+            keypoints_2d_std=kpts_2d_std,
+            keypoints_2d_mean=kpts_2d_mean,
+            keypoints_3d_std=kpts_3d_std,
+            keypoints_3d_mean=kpts_3d_mean)
 
         if self.factor_file:
             with get_local_path(self.factor_file) as local_path:
@@ -212,6 +220,7 @@ class H36MWholeBodyDataset(Human36mDataset):
                 'lifting_target': _kpts_3d[target_idx],
                 'lifting_target_visible': _kpts_visible[target_idx],
                 'target_img_path': _img_names[target_idx],
+                'keypoints_stats_info': keypoints_stats_info
             }
 
             if self.camera_param_file:
@@ -240,13 +249,9 @@ class H36MWholeBodyDataset(Human36mDataset):
         """Get 2D keypoints and 3D keypoints from annotation."""
         kpts = ann['keypoints_3d']
         kpts_2d = ann_2d['keypoints_2d']
-        # kpts_3d = np.array([[v for _, v in joint.items()]
-        #                     for _, joint in kpts.items()],
-        #                    dtype=np.float32).reshape(1, -1, 3)
-        # swap y and z, then invert z
-        # ref https://github.com/wholebody3d/wholebody3d/blob/main/utils/utils.py#L183 # noqa
-        kpts_3d = np.array([[joint['x'], joint['z'], -joint['y']]
-                            for _, joint in kpts.items()], )
+        kpts_3d = np.array([[joint['x'], joint['y'], joint['z']]
+                            for _, joint in kpts.items()],
+                           dtype=np.float32)[np.newaxis, ...]
         kpts_2d = np.array([[v for _, v in joint.items()]
                             for _, joint in kpts_2d.items()],
                            dtype=np.float32).reshape(1, -1, 2)

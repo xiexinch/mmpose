@@ -299,7 +299,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             pred_img_data = pred_img_data.reshape(vis_height,
                                                   vis_width * num_instances,
                                                   -1)
-        plt.show()
+
         plt.close(fig)
 
         return pred_img_data

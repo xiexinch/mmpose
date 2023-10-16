@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -71,7 +71,7 @@ def flip_keypoints_custom_center(keypoints: np.ndarray,
                                  flip_indices: List[int],
                                  center_mode: str = 'static',
                                  center_x: float = 0.5,
-                                 center_index: int = 0):
+                                 center_index: Union[int, list] = 0):
     """Flip human joints horizontally.
 
     Note:
