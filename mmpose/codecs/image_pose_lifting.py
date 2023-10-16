@@ -228,6 +228,20 @@ class ImagePoseLifting(BaseKeypointCodec):
                                     self.target_mean) / self.target_std
 
         if keypoints_stats_info is not None:
+            assert 'keypoints_2d_std' in keypoints_stats_info
+            assert 'keypoints_2d_mean' in keypoints_stats_info
+            assert 'keypoints_3d_std' in keypoints_stats_info
+            assert 'keypoints_3d_mean' in keypoints_stats_info
+            keypoints_std = keypoints_stats_info['keypoints_2d_std']
+            keypoints_mean = keypoints_stats_info['keypoints_2d_mean']
+            target_std = keypoints_stats_info['keypoints_3d_std']
+            target_mean = keypoints_stats_info['keypoints_3d_mean']
+            keypoint_labels = ((keypoint_labels - keypoints_mean) /
+                               keypoints_std).astype(np.float32)
+            lifting_target_label = ((lifting_target_label - target_mean) /
+                                    target_std).astype(np.float32)
+
+        if keypoints_stats_info is not None:
             assert set(
                 keypoints_stats_info.keys()) == self.keypoints_stats_keys
             keypoints_std = keypoints_stats_info['keypoints_2d_std']

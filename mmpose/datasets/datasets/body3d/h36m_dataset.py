@@ -283,9 +283,10 @@ class Human36mDataset(BaseMocapDataset):
             f'Number of `factors` ({factors.shape[0]}) does not match '
             f'number of `kpts_3d` ({kpts_3d.shape[0]}).')
 
-        for idx, frame_ids in enumerate(self.sequence_indices):
-            factor = factors[frame_ids].astype(np.float32)
-            instance_list[idx].update({'factor': factor})
+        if self.data_mode == 'bottomup':
+            for idx, img_name in enumerate(self.img_names):
+                img_info = self.get_img_info(idx, img_name)
+                image_list.append(img_info)
 
         return instance_list, image_list
 
