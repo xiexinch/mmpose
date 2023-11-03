@@ -66,7 +66,7 @@ class RTT(BaseBackbone):
         if x.dim() == 3:
             x = x.squeeze(-1)
         x = self.keypoint_encoder(x)
-        x_ = x
+        x_ = x.clone()
         for layer in self.layers:
-            x = self.dropout(self.norm(layer(x) + x_))
+            x = self.dropout(self.norm(layer(x))) + x_
         return tuple([x.unsqueeze(-1)])
