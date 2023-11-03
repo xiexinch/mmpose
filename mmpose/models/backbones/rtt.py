@@ -66,4 +66,4 @@ class RTT(BaseBackbone):
         x = self.keypoint_encoder(x)
         for layer in self.layers:
             x = layer(x)
-        return x
+        return tuple([x])
