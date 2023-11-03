@@ -59,6 +59,8 @@ class RTT(BaseBackbone):
             TransformerLayer(embed_dims, 4, embed_dims * 4)
             for _ in range(num_layers)
         ])
+        self.norm = nn.LayerNorm(embed_dims)
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         if x.dim() == 3:
@@ -66,5 +68,5 @@ class RTT(BaseBackbone):
         x = self.keypoint_encoder(x)
         x_ = x
         for layer in self.layers:
-            x = layer(x) + x_
+            x = self.dropout(self.norm(layer(x) + x_))
         return tuple([x.unsqueeze(-1)])

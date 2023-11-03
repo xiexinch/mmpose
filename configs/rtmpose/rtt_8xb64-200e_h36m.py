@@ -17,7 +17,7 @@ param_scheduler = [
     dict(type='StepLR', step_size=100000, gamma=0.96, end=80, by_epoch=False)
 ]
 
-auto_scale_lr = dict(base_batch_size=512)
+auto_scale_lr = dict(base_batch_size=2048)
 
 # hooks
 default_hooks = dict(
@@ -121,7 +121,7 @@ val_pipeline = train_pipeline
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=256,
     num_workers=2,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
