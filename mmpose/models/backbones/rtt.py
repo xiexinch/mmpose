@@ -17,28 +17,6 @@ class KeypointPostionEncoder(nn.Module):
         return self.embeding(x)
 
 
-class TransformerLayer(nn.Module):
-
-    def __init__(self, embed_dims: int, num_heads: int,
-                 feedforward_channels: int):
-        super().__init__()
-        self.embed_dims = embed_dims
-
-        self.self_attn = nn.MultiheadAttention(embed_dims, num_heads)
-        self.cross_attn = nn.MultiheadAttention(embed_dims, num_heads)
-        self.ffn = nn.Sequential(
-            nn.Linear(embed_dims, feedforward_channels),
-            nn.GELU(),
-            nn.Linear(feedforward_channels, embed_dims),
-        )
-
-    def forward(self, x):
-        x = self.self_attn(x, x, x)[0]
-        x = self.cross_attn(x, x, x)[0]
-        x = self.ffn(x)
-        return x
-
-
 @MODELS.register_module()
 class RTT(BaseBackbone):
 
@@ -56,17 +34,14 @@ class RTT(BaseBackbone):
                                                        embed_dims)
 
         self.layers = nn.ModuleList([
-            TransformerLayer(embed_dims, 4, embed_dims * 4)
+            nn.TransformerEncoderLayer(d_model=embed_dims, nhead=8)
             for _ in range(num_layers)
         ])
-        self.norm = nn.LayerNorm(embed_dims)
-        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         if x.dim() == 3:
             x = x.squeeze(-1)
         x = self.keypoint_encoder(x)
-        x_ = x.clone()
         for layer in self.layers:
-            x = self.dropout(self.norm(layer(x))) + x_
+            x = layer(x)
         return tuple([x.unsqueeze(-1)])

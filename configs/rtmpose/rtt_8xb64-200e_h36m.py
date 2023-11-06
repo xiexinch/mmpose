@@ -95,10 +95,10 @@ codec = dict(
 # model settings
 model = dict(
     type='PoseLifter',
-    backbone=dict(type='RTT', num_keypoints=17, embed_dims=1024, num_layers=6),
+    backbone=dict(type='RTT', num_keypoints=17, embed_dims=768, num_layers=6),
     head=dict(
         type='TemporalRegressionHead',
-        in_channels=1024,
+        in_channels=768,
         num_joints=16,
         loss=dict(type='MSELoss'),
         decoder=codec,
