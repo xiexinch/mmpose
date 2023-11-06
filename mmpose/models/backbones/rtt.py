@@ -45,3 +45,41 @@ class RTT(BaseBackbone):
         for layer in self.layers:
             x = layer(x)
         return tuple([x.unsqueeze(-1)])
+
+
+class lifter_res_block(nn.Module):
+
+    def __init__(self, hidden=1024):
+        super(lifter_res_block, self).__init__()
+        self.l1 = nn.Linear(hidden, hidden)
+        self.l2 = nn.Linear(hidden, hidden)
+
+    def forward(self, x):
+        inp = x
+        x = nn.LeakyReLU()(self.l1(x))
+        x = nn.LeakyReLU()(self.l2(x))
+        x += inp
+
+        return x
+
+
+@MODELS.register_module()
+class LargeSimpleBaseline(nn.Module):
+
+    def __init__(self, in_channels=17 * 2, channels=1024):
+        super(LargeSimpleBaseline, self).__init__()
+
+        self.upscale = nn.Linear(in_channels, channels)
+        self.res_1 = lifter_res_block(hidden=channels)
+        self.res_2 = lifter_res_block(hidden=channels)
+        self.res_3 = lifter_res_block(hidden=channels)
+
+    def forward(self, x):
+        if x.dim() == 3:
+            x = x.squeeze(-1)
+        x = self.upscale(x)
+        x = nn.LeakyReLU()(self.res_1(x))
+        x = nn.LeakyReLU()(self.res_2(x))
+        x = nn.LeakyReLU()(self.res_3(x))
+
+        return tuple(x)
