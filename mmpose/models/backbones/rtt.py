@@ -81,5 +81,4 @@ class LargeSimpleBaseline(nn.Module):
         x = nn.LeakyReLU()(self.res_1(x))
         x = nn.LeakyReLU()(self.res_2(x))
         x = nn.LeakyReLU()(self.res_3(x))
-
-        return tuple(x)
+        return tuple([x.unsqueeze(-1)])
