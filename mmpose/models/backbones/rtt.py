@@ -1,5 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import torch
 import torch.nn as nn
+from mmengine.utils import digit_version
+from torch import Tensor
 
 from mmpose.registry import MODELS
 from .base_backbone import BaseBackbone
@@ -81,4 +84,80 @@ class LargeSimpleBaseline(nn.Module):
         x = nn.LeakyReLU()(self.res_1(x))
         x = nn.LeakyReLU()(self.res_2(x))
         x = nn.LeakyReLU()(self.res_3(x))
+        return tuple([x.unsqueeze(-1)])
+
+
+class ChannelAttention(nn.Module):
+    """Channel attention Module.
+
+    Args:
+        channels (int): The input (and output) channels of the attention layer.
+        init_cfg (dict or list[dict], optional): Initialization config dict.
+            Defaults to None
+    """
+
+    def __init__(self, channels: int) -> None:
+        super().__init__()
+        self.global_avgpool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(1, channels, bias=True)
+
+        if digit_version(torch.__version__) < (1, 7, 0):
+            self.act = nn.Hardsigmoid()
+        else:
+            self.act = nn.Hardsigmoid(inplace=True)
+
+    def forward(self, x: Tensor) -> Tensor:
+        """Forward function for ChannelAttention."""
+        with torch.cuda.amp.autocast(enabled=False):
+            out = self.global_avgpool(x)
+        out = self.fc(out)
+        out = self.act(out)
+        return x * out
+
+
+class LifterResBlock(nn.Module):
+
+    def __init__(self, channels: int = 1024, num_layers: int = 2):
+        super().__init__()
+
+        self.layers = nn.ModuleList(
+            [nn.Linear(channels, channels) for _ in range(num_layers)])
+
+        self.ca = ChannelAttention(channels)
+
+    def forward(self, x):
+        inp = x
+        for layer in self.layers:
+            x = nn.LeakyReLU()(layer(x))
+        x = self.ca(x) + inp
+        return x
+
+
+@MODELS.register_module()
+class AttnLinearNet(nn.Module):
+
+    def __init__(self,
+                 in_channels: int = 17 * 2,
+                 channels=1024,
+                 num_linears: int = 2,
+                 num_res_blocks: int = 2):
+        super().__init__()
+        self.sk_convert = nn.Linear(in_channels, in_channels)
+
+        # upscale
+        self.upscale = nn.Linear(in_channels, channels)
+        self.res_layers = nn.ModuleList([
+            LifterResBlock(channels=channels, num_layers=num_linears)
+            for _ in range(num_res_blocks)
+        ])
+
+        self.act = nn.LeakyReLU()
+
+    def forward(self, x: Tensor):
+        if x.dim() == 3:
+            x = x.squeeze(-1)
+        x = self.upscale(x)
+        for layer in self.res_layers:
+            x = self.act(layer(x))
+
         return tuple([x.unsqueeze(-1)])
