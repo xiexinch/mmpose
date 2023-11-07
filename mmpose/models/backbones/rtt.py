@@ -142,9 +142,6 @@ class AttnLinearNet(nn.Module):
                  num_linears: int = 2,
                  num_res_blocks: int = 2):
         super().__init__()
-        self.sk_convert = nn.Linear(in_channels, in_channels)
-
-        # upscale
         self.upscale = nn.Linear(in_channels, channels)
         self.res_layers = nn.ModuleList([
             LifterResBlock(channels=channels, num_layers=num_linears)
