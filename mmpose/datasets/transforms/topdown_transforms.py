@@ -217,7 +217,8 @@ class TopdownAffine3D(TopdownAffine):
             results['keypoints_3d'] = transformed_keypoints
 
         results['input_size'] = (w, h, d)
-        results['input_center'] = center
-        results['input_scale'] = scale
+        results['input_center'] = (center[0], center[1],
+                                   keypoints_z.mean(axis=0))
+        results['input_scale'] = (scale[0], scale[1], 1)
 
         return results
