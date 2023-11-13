@@ -9,7 +9,7 @@ from mmengine.structures import PixelData
 from torch import Tensor, nn
 
 from mmpose.codecs.utils import get_simcc_normalized
-from mmpose.evaluation.functional import keypoint_pck_accuracy
+from mmpose.evaluation.functional import keypoint_mpjpe
 from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
 from mmpose.models.utils.tta import flip_vectors
 from mmpose.registry import KEYPOINT_CODECS, MODELS
@@ -200,9 +200,10 @@ class RTM3DHead(BaseHead):
             flip_indices = batch_data_samples[0].metainfo['flip_indices']
             _feats, _feats_flip = feats
 
-            _batch_pred_x, _batch_pred_y = self.forward(_feats)
+            _batch_pred_x, _batch_pred_y, _batch_pred_z = self.forward(_feats)
 
-            _batch_pred_x_flip, _batch_pred_y_flip = self.forward(_feats_flip)
+            _batch_pred_x_flip, _batch_pred_y_flip, _batch_pred_z_flip\
+                = self.forward(_feats_flip)
             _batch_pred_x_flip, _batch_pred_y_flip = flip_vectors(
                 _batch_pred_x_flip,
                 _batch_pred_y_flip,
@@ -210,10 +211,11 @@ class RTM3DHead(BaseHead):
 
             batch_pred_x = (_batch_pred_x + _batch_pred_x_flip) * 0.5
             batch_pred_y = (_batch_pred_y + _batch_pred_y_flip) * 0.5
+            batch_pred_z = (_batch_pred_z + _batch_pred_z_flip) * 0.5
         else:
-            batch_pred_x, batch_pred_y = self.forward(feats)
+            batch_pred_x, batch_pred_y, batch_pred_z = self.forward(feats)
 
-        preds = self.decode((batch_pred_x, batch_pred_y))
+        preds = self.decode((batch_pred_x, batch_pred_y, batch_pred_z))
 
         if test_cfg.get('output_heatmaps', False):
             rank, _ = get_dist_info()
@@ -226,24 +228,28 @@ class RTM3DHead(BaseHead):
             # normalize the predicted 1d distribution
             batch_pred_x = get_simcc_normalized(batch_pred_x)
             batch_pred_y = get_simcc_normalized(batch_pred_y)
+            batch_pred_z = get_simcc_normalized(batch_pred_z)
 
             B, K, _ = batch_pred_x.shape
             # B, K, Wx -> B, K, Wx, 1
             x = batch_pred_x.reshape(B, K, 1, -1)
             # B, K, Wy -> B, K, 1, Wy
             y = batch_pred_y.reshape(B, K, -1, 1)
-            # B, K, Wx, Wy
-            batch_heatmaps = torch.matmul(y, x)
+            # B, K, Wz -> B, K, 1, Wz
+            z = batch_pred_z.reshape(B, K, -1, 1)
+            # B, K, Wx, Wy, Wz
+            batch_heatmaps = x * y * z
             pred_fields = [
                 PixelData(heatmaps=hm) for hm in batch_heatmaps.detach()
             ]
 
-            for pred_instances, pred_x, pred_y in zip(preds,
-                                                      to_numpy(batch_pred_x),
-                                                      to_numpy(batch_pred_y)):
+            for pred_instances, pred_x, pred_y, pred_z in zip(
+                    preds, to_numpy(batch_pred_x), to_numpy(batch_pred_y),
+                    to_numpy(batch_pred_z)):
 
                 pred_instances.keypoint_x_labels = pred_x[None]
                 pred_instances.keypoint_y_labels = pred_y[None]
+                pred_instances.keypoint_z_labels = pred_z[None]
 
             return preds, pred_fields
         else:
@@ -291,15 +297,15 @@ class RTM3DHead(BaseHead):
         losses.update(loss_kpt=loss)
 
         # calculate accuracy
-        _, avg_acc, _ = simcc_pck_accuracy(
+        _, mpjpe, _ = simcc_mpjpe(
             output=to_numpy(pred_simcc),
             target=to_numpy(gt_simcc),
             simcc_split_ratio=self.simcc_split_ratio,
             mask=to_numpy(keypoint_weights) > 0,
         )
 
-        acc_pose = torch.tensor(avg_acc, device=gt_x.device)
-        losses.update(acc_pose=acc_pose)
+        mpjpe = torch.tensor(mpjpe, device=gt_x.device)
+        losses.update(mpjpe=mpjpe)
 
         return losses
 
@@ -313,13 +319,13 @@ class RTM3DHead(BaseHead):
         return init_cfg
 
 
-def simcc_pck_accuracy(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
-                       target: Tuple[np.ndarray, np.ndarray, np.ndarray],
-                       simcc_split_ratio: float,
-                       mask: np.ndarray,
-                       thr: float = 0.05,
-                       normalize: Optional[np.ndarray] = None
-                       ) -> Tuple[np.ndarray, float, int]:
+def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
+                target: Tuple[np.ndarray, np.ndarray, np.ndarray],
+                simcc_split_ratio: float,
+                mask: np.ndarray,
+                thr: float = 0.05,
+                normalize: Optional[np.ndarray] = None
+                ) -> Tuple[np.ndarray, float, int]:
     """Calculate the pose accuracy of PCK for each individual keypoint and the
     averaged accuracy across all keypoints from 3D SimCC.
 
@@ -364,7 +370,7 @@ def simcc_pck_accuracy(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
     gt_coords, _ = get_simcc_maximum(gt_x, gt_y, gt_z)
     gt_coords /= simcc_split_ratio
 
-    return keypoint_pck_accuracy(pred_coords, gt_coords, mask, thr, normalize)
+    return keypoint_mpjpe(pred_coords, gt_coords, mask)
 
 
 def get_simcc_maximum(simcc_x: np.ndarray, simcc_y: np.ndarray,
