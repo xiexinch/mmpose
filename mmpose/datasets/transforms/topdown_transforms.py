@@ -167,7 +167,7 @@ class TopdownAffine3D(TopdownAffine):
             dict: The result dict.
         """
 
-        w, h = self.input_size
+        w, h, d = self.input_size
         warp_size = (int(w), int(h))
 
         # reshape bbox to fixed aspect ratio
@@ -216,7 +216,7 @@ class TopdownAffine3D(TopdownAffine):
                 (transformed_keypoints_xy, keypoints_z), axis=-1) / 1000
             results['keypoints_3d'] = transformed_keypoints
 
-        results['input_size'] = (w, h)
+        results['input_size'] = (w, h, d)
         results['input_center'] = center
         results['input_scale'] = scale
 
