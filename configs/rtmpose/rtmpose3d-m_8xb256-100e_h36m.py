@@ -189,7 +189,7 @@ train_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         pipeline=train_pipeline,
-    ))
+        sample_interval=1000))
 val_dataloader = dict(
     batch_size=64,
     num_workers=2,
@@ -202,7 +202,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         pipeline=val_pipeline,
-    ))
+        sample_interval=100))
 test_dataloader = val_dataloader
 
 # hooks
