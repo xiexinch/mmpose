@@ -8,7 +8,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
 
     METAINFO: dict = dict(from_file='configs/_base_/datasets/h36m.py')
 
-    def parse_data_info(self, raw_data_info: dict) -> dict | None:
+    def parse_data_info(self, raw_data_info: dict) -> dict:
         data_info = super().parse_data_info(raw_data_info)
         keypoints_3d = raw_data_info.get('keypoints_3d', None)
         if keypoints_3d is None:
