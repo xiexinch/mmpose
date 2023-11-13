@@ -297,14 +297,14 @@ class RTM3DHead(BaseHead):
         losses.update(loss_kpt=loss)
 
         # calculate accuracy
-        _, mpjpe, _ = simcc_mpjpe(
+        error = simcc_mpjpe(
             output=to_numpy(pred_simcc),
             target=to_numpy(gt_simcc),
             simcc_split_ratio=self.simcc_split_ratio,
             mask=to_numpy(keypoint_weights) > 0,
         )
 
-        mpjpe = torch.tensor(mpjpe, device=gt_x.device)
+        mpjpe = torch.tensor(error, device=gt_x.device)
         losses.update(mpjpe=mpjpe)
 
         return losses
@@ -324,8 +324,7 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
                 simcc_split_ratio: float,
                 mask: np.ndarray,
                 thr: float = 0.05,
-                normalize: Optional[np.ndarray] = None
-                ) -> Tuple[np.ndarray, float, int]:
+                normalize: Optional[np.ndarray] = None) -> float:
     """Calculate the pose accuracy of PCK for each individual keypoint and the
     averaged accuracy across all keypoints from 3D SimCC.
 
