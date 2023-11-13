@@ -13,7 +13,7 @@ class Naive3DLabel(BaseKeypointCodec):
     auxiliary_encode_keys = {'keypoints_3d'}
 
     label_mapping_table = dict(
-        keypoint_x_lables='keypoint_x_labels',
+        keypoint_x_labels='keypoint_x_labels',
         keypiont_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
@@ -32,11 +32,11 @@ class Naive3DLabel(BaseKeypointCodec):
                keypoints_visible: Optional[np.ndarray] = None):
         """Encode keypoints to 3D labels."""
 
-        encoded = {}
-        encoded['keypoint_x_labels'] = keypoints_3d[..., 0]
-        encoded['keypoint_y_labels'] = keypoints_3d[..., 1]
-        encoded['keypoint_z_labels'] = keypoints_3d[..., 2]
-        encoded['keypoint_weights'] = keypoints_visible
+        encoded = dict(
+            keypoint_x_labels=keypoints_3d[..., 0],
+            keypoint_y_labels=keypoints_3d[..., 1],
+            keypoint_z_labels=keypoints_3d[..., 2],
+            keypoint_weights=keypoints_visible)
         return encoded
 
     def decode(self, keypoints, keypoints_3d, keypoints_visible):

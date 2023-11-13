@@ -18,7 +18,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         _keypoints_3d = np.array(
             keypoints_3d, dtype=np.float32).reshape(1, -1, 4)
         keypoints_3d = _keypoints_3d[..., :3]
-        keypoints_3d_visible = np.min(1, _keypoints_3d[..., 3])
+        keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
         data_info['keypoints_3d'] = keypoints_3d
         data_info['keypoints_3d_visible'] = keypoints_3d_visible
 

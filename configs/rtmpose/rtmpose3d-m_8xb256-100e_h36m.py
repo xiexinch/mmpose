@@ -202,7 +202,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         pipeline=val_pipeline,
-        sample_interval=100))
+        sample_interval=1000))
 test_dataloader = val_dataloader
 
 # hooks
