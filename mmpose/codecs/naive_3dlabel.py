@@ -14,7 +14,7 @@ class Naive3DLabel(BaseKeypointCodec):
 
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
-        keypiont_y_labels='keypoint_y_labels',
+        keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
     )
