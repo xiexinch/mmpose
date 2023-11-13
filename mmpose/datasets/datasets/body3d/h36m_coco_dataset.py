@@ -10,7 +10,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
 
     def parse_data_info(self, raw_data_info: dict) -> dict:
         data_info = super().parse_data_info(raw_data_info)
-        keypoints_3d = raw_data_info.get('keypoints_3d', None)
+        keypoints_3d = raw_data_info['raw_ann_info'].get('keypoints_3d', None)
         if keypoints_3d is None:
             raise ValueError('keypoints_3d is required in data_info')
 
