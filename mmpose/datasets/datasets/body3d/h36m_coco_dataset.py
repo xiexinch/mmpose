@@ -1,4 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import numpy as np
+
 from mmpose.registry import DATASETS
 from ..base import BaseCocoStyleDataset
 
@@ -13,7 +15,11 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         keypoints_3d = raw_data_info['raw_ann_info'].get('keypoints_3d', None)
         if keypoints_3d is None:
             raise ValueError('keypoints_3d is required in data_info')
-
+        _keypoints_3d = np.array(
+            keypoints_3d, dtype=np.float32).reshape(1, -1, 4)
+        keypoints_3d = _keypoints_3d[..., :3]
+        keypoints_3d_visible = np.min(1, _keypoints_3d[..., 3])
         data_info['keypoints_3d'] = keypoints_3d
+        data_info['keypoints_3d_visible'] = keypoints_3d_visible
 
         return data_info

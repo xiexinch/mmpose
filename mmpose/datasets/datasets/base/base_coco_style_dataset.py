@@ -228,12 +228,9 @@ class BaseCocoStyleDataset(BaseDataset):
 
         instance_list = []
         image_list = []
-
-        pbar = ProgressBar(len(self.coco.getImgIds()))
-        print_log(
-            'Processing '
-            f'{len(self.coco.getImgIds()) // self.sample_interval} images',
-            logger='current')
+        num_imgs = len(self.coco.getImgIds())
+        pbar = ProgressBar(num_imgs // self.sample_interval)
+        print_log(f'Processing {pbar.task_num} images', logger='current')
         for img_id in self.coco.getImgIds():
             if img_id % self.sample_interval != 0:
                 continue
