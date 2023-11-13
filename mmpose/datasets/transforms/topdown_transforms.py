@@ -140,3 +140,74 @@ class TopdownAffine(BaseTransform):
         repr_str += f'(input_size={self.input_size}, '
         repr_str += f'use_udp={self.use_udp})'
         return repr_str
+
+
+@TRANSFORMS.register_module()
+class TopdownAffine3D(TopdownAffine):
+
+    def transform(self, results: Dict) -> Optional[dict]:
+        """The transform function of :class:`TopdownAffine`.
+
+        See ``transform()`` method of :class:`BaseTransform` for details.
+
+        Args:
+            results (dict): The result dict
+
+        Returns:
+            dict: The result dict.
+        """
+
+        w, h = self.input_size
+        warp_size = (int(w), int(h))
+
+        # reshape bbox to fixed aspect ratio
+        results['bbox_scale'] = self._fix_aspect_ratio(
+            results['bbox_scale'], aspect_ratio=w / h)
+
+        # TODO: support multi-instance
+        assert results['bbox_center'].shape[0] == 1, (
+            'Top-down heatmap only supports single instance. Got invalid '
+            f'shape of bbox_center {results["bbox_center"].shape}.')
+
+        center = results['bbox_center'][0]
+        scale = results['bbox_scale'][0]
+        if 'bbox_rotation' in results:
+            rot = results['bbox_rotation'][0]
+        else:
+            rot = 0.
+
+        if self.use_udp:
+            warp_mat = get_udp_warp_matrix(
+                center, scale, rot, output_size=(w, h))
+        else:
+            warp_mat = get_warp_matrix(center, scale, rot, output_size=(w, h))
+
+        if isinstance(results['img'], list):
+            results['img'] = [
+                cv2.warpAffine(
+                    img, warp_mat, warp_size, flags=cv2.INTER_LINEAR)
+                for img in results['img']
+            ]
+        else:
+            results['img'] = cv2.warpAffine(
+                results['img'], warp_mat, warp_size, flags=cv2.INTER_LINEAR)
+
+        if results.get('keypoints_3d', None) is not None:
+            transformed_keypoints = results['keypoints_3d'].copy() * 1000
+            # 只转换(x, y, z)坐标
+            # 对于3D关键点，需要将变换矩阵扩展到3x4
+            # warp_mat_3d = np.concatenate((warp_mat, [[0, 0, 1]]), axis=0)
+            # 对3D关键点的(x, y)部分应用仿射变换
+            # 并保持z坐标不变。
+            keypoints_xy = transformed_keypoints[..., :2]
+            keypoints_z = transformed_keypoints[..., 2:3]
+            transformed_keypoints_xy = cv2.transform(keypoints_xy, warp_mat)
+            transformed_keypoints = np.concatenate(
+                (transformed_keypoints_xy, keypoints_z), axis=-1) / 1000
+            results['keypoints_3d'] = transformed_keypoints
+
+        results['input_size'] = (w, h)
+        results['input_center'] = center
+        results['input_scale'] = scale
+
+        return results

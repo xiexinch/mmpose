@@ -120,9 +120,7 @@ train_pipeline = [
     dict(type='GenerateTarget', encoder=codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',
-                   'target_root', 'target_root_index', 'target_mean',
-                   'target_std'))
+        meta_keys=('id', 'category_id', 'img_path', 'keypoints_3d'))
 ]
 val_pipeline = train_pipeline
 
