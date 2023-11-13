@@ -14,6 +14,6 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         if keypoints_3d is None:
             raise ValueError('keypoints_3d is required in data_info')
 
-        data_info['keypoints_3d'] = keypoints_3d * 1000
+        data_info['keypoints_3d'] = keypoints_3d
 
         return data_info
