@@ -231,7 +231,8 @@ class BaseCocoStyleDataset(BaseDataset):
 
         pbar = ProgressBar(len(self.coco.getImgIds()))
         print_log(
-            f'Processing {len(self.coco.getImgIds())} images',
+            'Processing '
+            f'{len(self.coco.getImgIds() // self.sample_interval)} images',
             logger='current')
         for img_id in self.coco.getImgIds():
             if img_id % self.sample_interval != 0:
