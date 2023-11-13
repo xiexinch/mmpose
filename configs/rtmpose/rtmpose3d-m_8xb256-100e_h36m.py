@@ -47,7 +47,7 @@ codec = dict(
 
 # model settings
 model = dict(
-    type='TopdownPoseEstimator',
+    type='TopdownPoseEstimator3D',
     data_preprocessor=dict(
         type='PoseDataPreprocessor',
         mean=[123.675, 116.28, 103.53],
