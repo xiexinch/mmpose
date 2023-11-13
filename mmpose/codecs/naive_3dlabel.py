@@ -18,6 +18,12 @@ class Naive3DLabel(BaseKeypointCodec):
         keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
+        keypoints_3d='keypoints_3d',
+        keypoints_3d_visible='keypoints_3d_visible')
+    instance_mapping_table = dict(
+        bboxes='bboxes',
+        keypoints_3d='keypoints_3d',
+        keypoints_3d_visible='keypoints_3d_visible',
     )
 
     def __init__(self,
@@ -50,6 +56,8 @@ class Naive3DLabel(BaseKeypointCodec):
             keypoint_y_labels=y_labels,
             keypoint_z_labels=z_labels,
             keypoint_weights=keypoint_weights,
+            keypoints_3d=keypoints_3d,
+            keypoints_3d_visible=keypoints_visible,
         )
         return encoded
 

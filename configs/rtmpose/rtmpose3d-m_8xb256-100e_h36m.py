@@ -144,6 +144,7 @@ val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine3D', input_size=codec['input_size']),
+    dict(type='GenerateTarget', encoder=codec),
     dict(type='PackPoseInputs')
 ]
 
@@ -175,7 +176,13 @@ train_pipeline_stage2 = [
                 p=0.5),
         ]),
     dict(type='GenerateTarget', encoder=codec),
-    dict(type='PackPoseInputs')
+    dict(
+        type='PackPoseInputs',
+        meta_keys=('id', 'img_id', 'img_path', 'category_id', 'crowd_index',
+                   'ori_shape', 'img_shape', 'input_size', 'input_center',
+                   'input_scale', 'flip', 'flip_direction', 'flip_indices',
+                   'raw_ann_info', 'dataset_name', 'keypoints_3d',
+                   'keypoints_3d_visible'))
 ]
 
 # data loaders
@@ -189,8 +196,7 @@ train_dataloader = dict(
         ann_file='annotation_body2d/h36m_coco_train_fps50.json',
         data_root=data_root,
         data_prefix=dict(img='images/'),
-        pipeline=train_pipeline,
-        sample_interval=1000))
+        pipeline=train_pipeline))
 val_dataloader = dict(
     batch_size=64,
     num_workers=2,
@@ -202,8 +208,7 @@ val_dataloader = dict(
         ann_file='annotation_body2d/h36m_test_fps50.json',
         data_root=data_root,
         data_prefix=dict(img='images/'),
-        pipeline=val_pipeline,
-        sample_interval=1000))
+        pipeline=val_pipeline))
 test_dataloader = val_dataloader
 
 # hooks
@@ -229,11 +234,13 @@ val_evaluator = [
         type='MPJPE',
         mode='mpjpe',
         gt_field='keypoints_3d',
-        gt_mask_filed='keypoints_3d_visible'),
+        gt_mask_field='keypoints_3d_visible',
+        img_field='img_path'),
     dict(
         type='MPJPE',
         mode='p-mpjpe',
         gt_field='keypoints_3d',
-        gt_mask_filed='keypoints_3d_visible')
+        gt_mask_field='keypoints_3d_visible',
+        img_field='img_path')
 ]
 test_evaluator = val_evaluator

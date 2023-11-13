@@ -50,7 +50,8 @@ class MPJPE(BaseMetric):
                  prefix: Optional[str] = None,
                  skip_list: List[str] = [],
                  gt_field: str = 'lifting_target',
-                 gt_mask_filed: str = 'lifting_target_visible') -> None:
+                 gt_mask_field: str = 'lifting_target_visible',
+                 img_field: str = 'target_img_path') -> None:
         super().__init__(collect_device=collect_device, prefix=prefix)
         allowed_modes = self.ALIGNMENT.keys()
         if mode not in allowed_modes:
@@ -60,7 +61,8 @@ class MPJPE(BaseMetric):
         self.mode = mode
         self.skip_list = skip_list
         self.gt_field = gt_field
-        self.gt_mask_filed = gt_mask_filed
+        self.gt_mask_field = gt_mask_field
+        self.img_field = img_field
 
     def process(self, data_batch: Sequence[dict],
                 data_samples: Sequence[dict]) -> None:
@@ -84,10 +86,13 @@ class MPJPE(BaseMetric):
             # ground truth keypoints coordinates, [T, K, D]
             gt_coords = gt[self.gt_field]
             # ground truth keypoints_visible, [T, K, 1]
-            mask = gt[self.gt_mask_filed].astype(bool).reshape(
+            mask = gt[self.gt_mask_field].astype(bool).reshape(
                 gt_coords.shape[0], -1)
             # instance action
-            img_path = data_sample['target_img_path'][0]
+            if isinstance(data_sample[self.img_field], list):
+                img_path = data_sample[self.img_field][0]
+            else:
+                img_path = data_sample[self.img_field]
             _, rest = osp.basename(img_path).split('_', 1)
             action, _ = rest.split('.', 1)
             actions = np.array([action] * gt_coords.shape[0])
