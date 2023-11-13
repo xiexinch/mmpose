@@ -2,13 +2,14 @@
 import warnings
 from typing import Optional, Sequence, Tuple, Union
 
+import numpy as np
 import torch
 from mmengine.dist import get_dist_info
 from mmengine.structures import PixelData
 from torch import Tensor, nn
 
 from mmpose.codecs.utils import get_simcc_normalized
-from mmpose.evaluation.functional import simcc_pck_accuracy
+from mmpose.evaluation.functional import keypoint_pck_accuracy
 from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
 from mmpose.models.utils.tta import flip_vectors
 from mmpose.registry import KEYPOINT_CODECS, MODELS
@@ -310,3 +311,119 @@ class RTM3DHead(BaseHead):
             dict(type='Normal', layer=['Linear'], std=0.01, bias=0),
         ]
         return init_cfg
+
+
+def simcc_pck_accuracy(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
+                       target: Tuple[np.ndarray, np.ndarray, np.ndarray],
+                       simcc_split_ratio: float,
+                       mask: np.ndarray,
+                       thr: float = 0.05,
+                       normalize: Optional[np.ndarray] = None
+                       ) -> Tuple[np.ndarray, float, int]:
+    """Calculate the pose accuracy of PCK for each individual keypoint and the
+    averaged accuracy across all keypoints from 3D SimCC.
+
+    Note:
+        - PCK metric measures accuracy of the localization of the body joints.
+        - The distances between predicted positions and the ground-truth ones
+          are typically normalized by the bounding box size.
+
+    Args:
+        output (Tuple[np.ndarray, np.ndarray, np.ndarray]): Model predicted
+            3D SimCC (x, y, z).
+        target (Tuple[np.ndarray, np.ndarray, np.ndarray]): Groundtruth
+            3D SimCC (x, y, z).
+        simcc_split_ratio (float): SimCC split ratio for recovering actual
+            coordinates.
+        mask (np.ndarray[N, K]): Visibility mask for the target. False for
+            invisible joints, and True for visible.
+        thr (float): Threshold for PCK calculation. Default 0.05.
+        normalize (Optional[np.ndarray[N, 3]]): Normalization factor for
+            H, W, and Depth.
+
+    Returns:
+        Tuple[np.ndarray, float, int]:
+        - np.ndarray[K]: Accuracy of each keypoint.
+        - float: Averaged accuracy across all keypoints.
+        - int: Number of valid keypoints.
+    """
+    pred_x, pred_y, pred_z = output
+    gt_x, gt_y, gt_z = target
+
+    N, _, Wx = pred_x.shape
+    _, _, Wy = pred_y.shape
+    _, _, Wz = pred_z.shape
+    W, H, D = int(Wx / simcc_split_ratio), int(Wy / simcc_split_ratio), int(
+        Wz / simcc_split_ratio)
+
+    if normalize is None:
+        normalize = np.tile(np.array([[H, W, D]]), (N, 1))
+
+    pred_coords, _ = get_simcc_maximum(pred_x, pred_y, pred_z)
+    pred_coords /= simcc_split_ratio
+    gt_coords, _ = get_simcc_maximum(gt_x, gt_y, gt_z)
+    gt_coords /= simcc_split_ratio
+
+    return keypoint_pck_accuracy(pred_coords, gt_coords, mask, thr, normalize)
+
+
+def get_simcc_maximum(simcc_x: np.ndarray, simcc_y: np.ndarray,
+                      simcc_z: np.ndarray
+                      ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Get maximum response location and value from simcc representations.
+
+    Note:
+        instance number: N
+        num_keypoints: K
+        heatmap height: H
+        heatmap width: W
+
+    Args:
+        simcc_x (np.ndarray): x-axis SimCC in shape (K, Wx) or (N, K, Wx)
+        simcc_y (np.ndarray): y-axis SimCC in shape (K, Wy) or (N, K, Wy)
+        simcc_z (np.ndarray): z-axis SimCC in shape (K, Wz) or (N, K, Wz)
+
+    Returns:
+        tuple:
+        - locs (np.ndarray): locations of maximum heatmap responses in shape
+            (K, 3) or (N, K, 3)
+        - vals (np.ndarray): values of maximum heatmap responses in shape
+            (K,) or (N, K)
+    """
+
+    assert isinstance(simcc_x, np.ndarray), ('simcc_x should be numpy.ndarray')
+    assert isinstance(simcc_y, np.ndarray), ('simcc_y should be numpy.ndarray')
+    assert isinstance(simcc_z, np.ndarray), ('simcc_z should be numpy.ndarray')
+    assert simcc_x.ndim == 2 or simcc_x.ndim == 3, (
+        f'Invalid shape {simcc_x.shape}')
+    assert simcc_y.ndim == 2 or simcc_y.ndim == 3, (
+        f'Invalid shape {simcc_y.shape}')
+    assert simcc_z.ndim == 2 or simcc_z.ndim == 3, (
+        f'Invalid shape {simcc_z.shape}')
+    assert simcc_x.ndim == simcc_y.ndim == simcc_z.ndim, (
+        f'{simcc_x.shape} != {simcc_y.shape} != {simcc_z.ndim} ')
+
+    if simcc_x.ndim == 3:
+        N, K, Wx = simcc_x.shape
+        simcc_x = simcc_x.reshape(N * K, -1)
+        simcc_y = simcc_y.reshape(N * K, -1)
+        simcc_z = simcc_z.reshape(N * K, -1)
+    else:
+        N = None
+
+    x_locs = np.argmax(simcc_x, axis=1)
+    y_locs = np.argmax(simcc_y, axis=1)
+    z_locs = np.argmax(simcc_z, axis=1)
+    locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
+    max_val_x = np.amax(simcc_x, axis=1)
+    max_val_y = np.amax(simcc_y, axis=1)
+    max_val_z = np.amax(simcc_z, axis=1)
+
+    vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
+    locs[vals <= 0.] = -1
+
+    if N:
+        locs = locs.reshape(N, K, 3)
+        vals = vals.reshape(N, K)
+
+    return locs, vals
