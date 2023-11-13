@@ -145,6 +145,16 @@ class TopdownAffine(BaseTransform):
 @TRANSFORMS.register_module()
 class TopdownAffine3D(TopdownAffine):
 
+    def __init__(self,
+                 input_size: Tuple[int, int],
+                 use_udp: bool = False) -> None:
+        super().__init__((input_size[0], input_size[1]), use_udp)
+
+        assert is_seq_of(input_size, int) and len(input_size) == 3, (
+            f'Invalid input_size {input_size}')
+        self.input_size = input_size
+        self.use_udp = use_udp
+
     def transform(self, results: Dict) -> Optional[dict]:
         """The transform function of :class:`TopdownAffine`.
 
