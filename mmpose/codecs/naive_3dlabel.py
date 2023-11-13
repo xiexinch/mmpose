@@ -29,9 +29,13 @@ class Naive3DLabel(BaseKeypointCodec):
         super().__init__()
         self.input_size = input_size
         self.simcc_split_ratio = simcc_split_ratio
-        self.sigma = sigma
         self.label_smooth_weight = label_smooth_weight
         self.normalize = normalize
+
+        if isinstance(sigma, (float, int)):
+            self.sigma = np.array([sigma, sigma, sigma], dtype=np.float32)
+        else:
+            self.sigma = np.array(sigma, dtype=np.float32)
 
     def encode(self,
                keypoints: np.ndarray,
