@@ -19,9 +19,12 @@ class Naive3DLabel(BaseKeypointCodec):
         keypoint_weights='keypoint_weights',
     )
 
-    def __init__(self, input_size) -> None:
+    def __init__(self,
+                 input_size: tuple,
+                 simcc_split_ratio: float = 2.0) -> None:
         super().__init__()
         self.input_size = input_size
+        self.simcc_split_ratio = simcc_split_ratio
 
     def encode(self,
                keypoints: np.ndarray,

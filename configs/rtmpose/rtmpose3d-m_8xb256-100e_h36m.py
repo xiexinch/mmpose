@@ -41,6 +41,7 @@ auto_scale_lr = dict(base_batch_size=1024)
 codec = dict(
     type='Naive3DLabel',
     input_size=(192, 256),
+    simcc_split_ratio=2.0,
 )
 
 # model settings
