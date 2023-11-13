@@ -48,7 +48,9 @@ class MPJPE(BaseMetric):
                  mode: str = 'mpjpe',
                  collect_device: str = 'cpu',
                  prefix: Optional[str] = None,
-                 skip_list: List[str] = []) -> None:
+                 skip_list: List[str] = [],
+                 gt_field: str = 'lifting_target',
+                 gt_mask_filed: str = 'lifting_target_visible') -> None:
         super().__init__(collect_device=collect_device, prefix=prefix)
         allowed_modes = self.ALIGNMENT.keys()
         if mode not in allowed_modes:
@@ -57,6 +59,8 @@ class MPJPE(BaseMetric):
 
         self.mode = mode
         self.skip_list = skip_list
+        self.gt_field = gt_field
+        self.gt_mask_filed = gt_mask_filed
 
     def process(self, data_batch: Sequence[dict],
                 data_samples: Sequence[dict]) -> None:
@@ -78,9 +82,9 @@ class MPJPE(BaseMetric):
             # ground truth data_info
             gt = data_sample['gt_instances']
             # ground truth keypoints coordinates, [T, K, D]
-            gt_coords = gt['lifting_target']
+            gt_coords = gt[self.gt_field]
             # ground truth keypoints_visible, [T, K, 1]
-            mask = gt['lifting_target_visible'].astype(bool).reshape(
+            mask = gt[self.gt_mask_filed].astype(bool).reshape(
                 gt_coords.shape[0], -1)
             # instance action
             img_path = data_sample['target_img_path'][0]

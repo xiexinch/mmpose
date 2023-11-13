@@ -225,7 +225,15 @@ custom_hooks = [
 
 # evaluators
 val_evaluator = [
-    dict(type='MPJPE', mode='mpjpe'),
-    dict(type='MPJPE', mode='p-mpjpe')
+    dict(
+        type='MPJPE',
+        mode='mpjpe',
+        gt_field='keypoints_3d',
+        gt_mask_filed='keypoints_3d_visible'),
+    dict(
+        type='MPJPE',
+        mode='p-mpjpe',
+        gt_field='keypoints_3d',
+        gt_mask_filed='keypoints_3d_visible')
 ]
 test_evaluator = val_evaluator
