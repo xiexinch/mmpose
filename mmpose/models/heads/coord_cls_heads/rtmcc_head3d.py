@@ -114,7 +114,7 @@ class RTM3DHead(BaseHead):
 
         W = int(self.input_size[0] * self.simcc_split_ratio)
         H = int(self.input_size[1] * self.simcc_split_ratio)
-        D = 1000
+        D = int(self.input_size[2] * self.simcc_split_ratio)
 
         self.gau = RTMCCBlock(
             self.out_channels,
