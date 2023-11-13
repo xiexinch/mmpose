@@ -224,8 +224,8 @@ custom_hooks = [
 ]
 
 # evaluators
-val_evaluator = dict(
-    type='CocoMetric',
-    ann_file=data_root + 'annotation_body2d/h36m_coco_test.json',
-    use_area=True)
+val_evaluator = [
+    dict(type='MPJPE', mode='mpjpe'),
+    dict(type='MPJPE', mode='p-mpjpe')
+]
 test_evaluator = val_evaluator
