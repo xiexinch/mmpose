@@ -2,16 +2,19 @@
 from itertools import product
 from typing import Optional, Tuple, Union
 
+import cv2
 import numpy as np
 
 from mmpose.registry import KEYPOINT_CODECS
+# from mmpose.utils import SimpleCamera
 from .base import BaseKeypointCodec
+from .utils import pixel_to_camera
 
 
 @KEYPOINT_CODECS.register_module()
 class Naive3DLabel(BaseKeypointCodec):
 
-    auxiliary_encode_keys = {'keypoints_3d'}
+    auxiliary_encode_keys = {'transformed_keypoints_3d'}
 
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
@@ -19,10 +22,13 @@ class Naive3DLabel(BaseKeypointCodec):
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
         keypoints_3d='keypoints_3d',
+        keypoints_3d_gt='keypoints_3d_gt',
         keypoints_3d_visible='keypoints_3d_visible')
+
     instance_mapping_table = dict(
         bboxes='bboxes',
         keypoints_3d='keypoints_3d',
+        keypoints_3d_gt='keypoints_3d_gt',
         keypoints_3d_visible='keypoints_3d_visible',
     )
 
@@ -31,12 +37,14 @@ class Naive3DLabel(BaseKeypointCodec):
                  simcc_split_ratio: float = 2.0,
                  sigma: Union[float, int, Tuple[float]] = 6.0,
                  label_smooth_weight: float = 0.0,
-                 normalize: bool = True) -> None:
+                 normalize: bool = True,
+                 rootrel: bool = False) -> None:
         super().__init__()
         self.input_size = input_size
         self.simcc_split_ratio = simcc_split_ratio
         self.label_smooth_weight = label_smooth_weight
         self.normalize = normalize
+        self.rootrel = rootrel
 
         if isinstance(sigma, (float, int)):
             self.sigma = np.array([sigma, sigma, sigma], dtype=np.float32)
@@ -45,24 +53,26 @@ class Naive3DLabel(BaseKeypointCodec):
 
     def encode(self,
                keypoints: np.ndarray,
-               keypoints_3d: np.ndarray,
-               keypoints_visible: Optional[np.ndarray] = None):
+               transformed_keypoints_3d: np.ndarray,
+               keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
 
-        x_labels, y_labels, z_labels, keypoint_weights =  \
-            self._generate_gaussian(keypoints_3d, keypoints_visible)
+        x, y, z, weights = self._generate_gaussian(transformed_keypoints_3d,
+                                                   keypoints_visible)  # noqa
         encoded = dict(
-            keypoint_x_labels=x_labels,
-            keypoint_y_labels=y_labels,
-            keypoint_z_labels=z_labels,
-            keypoint_weights=keypoint_weights,
-            keypoints_3d=keypoints_3d,
+            keypoint_x_labels=x,
+            keypoint_y_labels=y,
+            keypoint_z_labels=z,
+            keypoint_weights=weights,
+            transformed_keypoints_3d=transformed_keypoints_3d,
             keypoints_3d_visible=keypoints_visible,
         )
         return encoded
 
     def decode(self, simcc_x: np.ndarray, simcc_y: np.ndarray,
-               simcc_z: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+               simcc_z: np.ndarray, warp_mat: np.ndarray, z_max: np.ndarray,
+               z_min: np.ndarray,
+               camera_param: dict) -> Tuple[np.ndarray, np.ndarray]:
         """Decode keypoints from 3D labels."""
         keypoints, scores = get_simcc_maximum(simcc_x, simcc_y, simcc_z)
 
@@ -71,6 +81,29 @@ class Naive3DLabel(BaseKeypointCodec):
             scores = scores[None, :]
 
         keypoints /= self.simcc_split_ratio
+
+        # 1. z 轴坐标从 (0, d) 映射到 (z_min, z_max)
+        z_max = z_max[0]
+        z_min = z_min[0]
+        # print(z_max, z_min, self.input_size[2])
+        keypoints_z = keypoints[..., 2:] / self.input_size[2] * (z_max -
+                                                                 z_min) + z_min
+        # 2. 不处理 z
+        # keypoints_z = keypoints[..., 2:]
+
+        # 还原 xy 到原图空间
+        keypoints_xy = keypoints[..., :2]
+        warp_mat_homogeneous = np.vstack([warp_mat[0], [0, 0, 1]])
+        warp_inv = warp_inv = np.linalg.inv(warp_mat_homogeneous)
+        keypoints_xy = cv2.transform(keypoints_xy, warp_inv)[..., :2]
+        # 拼接 xyz
+        keypoints = np.concatenate((keypoints_xy, keypoints_z), axis=-1)
+
+        # 转换图像空间
+        # camera = SimpleCamera(camera_param)
+        fx, fy = camera_param['f']
+        cx, cy = camera_param['c']
+        keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
         return keypoints, scores
 
     def _map_coordinates(self,

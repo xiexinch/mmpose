@@ -236,14 +236,6 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
         for pred_instances, pred_fields, data_sample in zip_longest(
                 batch_pred_instances, batch_pred_fields, batch_data_samples):
 
-            # convert keypoint coordinates from input space to image space
-            input_center = data_sample.metainfo['input_center']
-            input_scale = data_sample.metainfo['input_scale']
-            input_size = data_sample.metainfo['input_size']
-
-            pred_instances.keypoints[..., :3] = \
-                pred_instances.keypoints[..., :3] / input_size * input_scale \
-                + input_center - 0.5 * input_scale
             if 'keypoints_visible' not in pred_instances:
                 pred_instances.keypoints_visible = \
                     pred_instances.keypoint_scores
@@ -255,10 +247,6 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                     if key.startswith('keypoint'):
                         pred_instances.set_field(
                             value[:, output_keypoint_indices], key)
-
-            # add bbox information into pred_instances
-            # pred_instances.bboxes = gt_instances.bboxes
-            # pred_instances.bbox_scores = gt_instances.bbox_scores
 
             data_sample.pred_instances = pred_instances
 

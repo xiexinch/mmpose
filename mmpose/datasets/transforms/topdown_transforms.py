@@ -203,22 +203,34 @@ class TopdownAffine3D(TopdownAffine):
                 results['img'], warp_mat, warp_size, flags=cv2.INTER_LINEAR)
 
         if results.get('keypoints_3d', None) is not None:
-            transformed_keypoints = results['keypoints_3d'].copy() * 1000
-            # 只转换(x, y, z)坐标
-            # 对于3D关键点，需要将变换矩阵扩展到3x4
-            # warp_mat_3d = np.concatenate((warp_mat, [[0, 0, 1]]), axis=0)
+            transformed_keypoints = results['keypoints_3d'].copy()
             # 对3D关键点的(x, y)部分应用仿射变换
-            # 并保持z坐标不变。
             keypoints_xy = transformed_keypoints[..., :2]
             keypoints_z = transformed_keypoints[..., 2:3]
-            transformed_keypoints_xy = cv2.transform(keypoints_xy, warp_mat)
+            transformed_xy = cv2.transform(keypoints_xy, warp_mat)
+            # 将 z 轴缩放到 (0, d)
+            # 1. 按照每个人缩放
+            z_max = np.max(results['keypoints_3d'][..., 2:])
+            z_min = np.min(results['keypoints_3d'][..., 2:])
+            transformed_z = (keypoints_z - z_min) / (z_max - z_min) * d
             transformed_keypoints = np.concatenate(
-                (transformed_keypoints_xy, keypoints_z), axis=-1) / 1000
-            results['keypoints_3d'] = transformed_keypoints
+                (transformed_xy, transformed_z), axis=-1)
+            results['z_max'] = np.array([z_max])
+            results['z_min'] = np.array([z_min])
+
+            # 2. 按照数据集缩放
+            # transformed_z = (keypoints_z - results['z_min']) / (results['z_max'] - results['z_min']) * d # noqa: E501
+            # transformed_keypoints = np.concatenate(
+            #     (transformed_xy, transformed_z), axis=-1)
+            # 不处理 z
+            # transformed_keypoints = np.concatenate(
+            #     (transformed_xy, keypoints_z), axis=-1)
+            results['transformed_keypoints_3d'] = transformed_keypoints
 
         results['input_size'] = (w, h, d)
-        results['input_center'] = [center[0], center[1], keypoints_z.mean()]
-        results['input_scale'] = np.array([scale[0], scale[1], 1000.0],
+        results['input_center'] = [center[0], center[1], center[0]]
+        results['input_scale'] = np.array([scale[0], scale[1], 1.0],
                                           dtype=np.float32)
+        results['warp_mat'] = warp_mat
 
         return results

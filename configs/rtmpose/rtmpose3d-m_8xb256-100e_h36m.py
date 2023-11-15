@@ -1,8 +1,8 @@
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
-max_epochs = 100
-stage2_num_epochs = 30
+max_epochs = 420
+stage2_num_epochs = 20
 base_lr = 4e-3
 
 train_cfg = dict(max_epochs=max_epochs, val_interval=10)
@@ -38,12 +38,20 @@ param_scheduler = [
 auto_scale_lr = dict(base_batch_size=1024)
 
 # codec settings
-codec = dict(
+train_codec = dict(
     type='Naive3DLabel',
-    input_size=(192, 256, 1000),
+    input_size=(192, 256, 192),
     simcc_split_ratio=2.0,
-    sigma=(4.9, 5.66, 1),
+    sigma=(4.9, 5.66, 4.9),
     normalize=False)
+
+val_codec = dict(
+    type='Naive3DLabel',
+    input_size=(192, 256, 192),
+    simcc_split_ratio=2.0,
+    sigma=(4.9, 5.66, 4.9),
+    normalize=False,
+    rootrel=True)
 
 # model settings
 model = dict(
@@ -74,9 +82,9 @@ model = dict(
         type='RTM3DHead',
         in_channels=768,
         out_channels=17,
-        input_size=codec['input_size'],
-        in_featuremap_size=tuple([s // 32 for s in codec['input_size']]),
-        simcc_split_ratio=codec['simcc_split_ratio'],
+        input_size=train_codec['input_size'],
+        in_featuremap_size=tuple([s // 32 for s in train_codec['input_size']]),
+        simcc_split_ratio=train_codec['simcc_split_ratio'],
         final_layer_kernel_size=7,
         gau_cfg=dict(
             hidden_dims=256,
@@ -92,8 +100,8 @@ model = dict(
             use_target_weight=True,
             beta=10.,
             label_softmax=True),
-        decoder=codec),
-    test_cfg=dict(flip_test=True))
+        decoder=val_codec),
+    test_cfg=dict(flip_test=False))
 
 # base dataset settings
 dataset_type = 'H36MCOCODataset'
@@ -116,8 +124,8 @@ train_pipeline = [
     dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
-    dict(type='mmdet.YOLOXHSVRandomAug'),
+    dict(type='TopdownAffine3D', input_size=train_codec['input_size']),
+    dict(type='YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
         transforms=[
@@ -133,7 +141,7 @@ train_pipeline = [
                 min_width=0.2,
                 p=1.),
         ]),
-    dict(type='GenerateTarget', encoder=codec),
+    dict(type='GenerateTarget', encoder=train_codec),
     dict(
         type='PackPoseInputs',
         meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',
@@ -143,9 +151,15 @@ train_pipeline = [
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
-    dict(type='GenerateTarget', encoder=codec),
-    dict(type='PackPoseInputs')
+    dict(type='TopdownAffine3D', input_size=val_codec['input_size']),
+    dict(type='GenerateTarget', encoder=val_codec),
+    dict(
+        type='PackPoseInputs',
+        meta_keys=('id', 'img_id', 'img_path', 'category_id', 'crowd_index',
+                   'ori_shape', 'img_shape', 'input_size', 'input_center',
+                   'input_scale', 'flip', 'flip_direction', 'flip_indices',
+                   'raw_ann_info', 'dataset_name', 'warp_mat', 'z_max',
+                   'z_min', 'camera_param'))
 ]
 
 train_pipeline_stage2 = [
@@ -158,8 +172,8 @@ train_pipeline_stage2 = [
         shift_factor=0.,
         scale_factor=[0.75, 1.25],
         rotate_factor=60),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
-    dict(type='mmdet.YOLOXHSVRandomAug'),
+    dict(type='TopdownAffine3D', input_size=train_codec['input_size']),
+    dict(type='YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
         transforms=[
@@ -175,7 +189,7 @@ train_pipeline_stage2 = [
                 min_width=0.2,
                 p=0.5),
         ]),
-    dict(type='GenerateTarget', encoder=codec),
+    dict(type='GenerateTarget', encoder=train_codec),
     dict(
         type='PackPoseInputs',
         meta_keys=('id', 'img_id', 'img_path', 'category_id', 'crowd_index',
@@ -188,7 +202,7 @@ train_pipeline_stage2 = [
 # data loaders
 train_dataloader = dict(
     batch_size=256,
-    num_workers=2,
+    num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
@@ -196,9 +210,12 @@ train_dataloader = dict(
         ann_file='annotation_body2d/h36m_coco_train_fps50.json',
         data_root=data_root,
         data_prefix=dict(img='images/'),
-        pipeline=train_pipeline))
+        camera_param_file='annotation_body3d/cameras.pkl',
+        pipeline=train_pipeline,
+        # sample_interval=2000
+    ))
 val_dataloader = dict(
-    batch_size=64,
+    batch_size=256,
     num_workers=2,
     persistent_workers=True,
     drop_last=False,
@@ -208,12 +225,19 @@ val_dataloader = dict(
         ann_file='annotation_body2d/h36m_test_fps50.json',
         data_root=data_root,
         data_prefix=dict(img='images/'),
-        pipeline=val_pipeline))
+        camera_param_file='annotation_body3d/cameras.pkl',
+        pipeline=val_pipeline,
+        # sample_interval=2000
+    ))
 test_dataloader = val_dataloader
 
 # hooks
 default_hooks = dict(
-    checkpoint=dict(save_best='coco/AP', rule='greater', max_keep_ckpts=1))
+    checkpoint=dict(
+        type='CheckpointHook',
+        save_best='MPJPE',
+        rule='less',
+        max_keep_ckpts=1))
 
 custom_hooks = [
     dict(
@@ -222,10 +246,10 @@ custom_hooks = [
         momentum=0.0002,
         update_buffers=True,
         priority=49),
-    # dict(
-    #     type='mmdet.PipelineSwitchHook',
-    #     switch_epoch=max_epochs - stage2_num_epochs,
-    #     switch_pipeline=train_pipeline_stage2)
+    dict(
+        type='mmdet.PipelineSwitchHook',
+        switch_epoch=max_epochs - stage2_num_epochs,
+        switch_pipeline=train_pipeline_stage2)
 ]
 
 # evaluators
@@ -233,13 +257,13 @@ val_evaluator = [
     dict(
         type='MPJPE',
         mode='mpjpe',
-        gt_field='keypoints_3d',
+        gt_field='keypoints_3d_gt',
         gt_mask_field='keypoints_3d_visible',
         img_field='img_path'),
     dict(
         type='MPJPE',
         mode='p-mpjpe',
-        gt_field='keypoints_3d',
+        gt_field='keypoints_3d_gt',
         gt_mask_field='keypoints_3d_visible',
         img_field='img_path')
 ]

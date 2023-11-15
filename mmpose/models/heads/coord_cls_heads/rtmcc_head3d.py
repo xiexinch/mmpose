@@ -5,7 +5,7 @@ from typing import Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from mmengine.dist import get_dist_info
-from mmengine.structures import PixelData
+from mmengine.structures import InstanceData, PixelData
 from torch import Tensor, nn
 
 from mmpose.codecs.utils import get_simcc_normalized
@@ -164,6 +164,18 @@ class RTM3DHead(BaseHead):
 
         return pred_x, pred_y, pred_z
 
+    def decode(self, batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat,
+               batch_z_max, batch_z_min, camera_params):
+        batch_outputs = to_numpy((batch_pred_x, batch_pred_y, batch_pred_z,
+                                  batch_warp_mat, batch_z_max, batch_z_min),
+                                 unzip=True)
+        preds = []
+        for output, camera_param in zip(batch_outputs, camera_params):
+            keypoints, scores = self.decoder.decode(*output, camera_param)
+            preds.append(
+                InstanceData(keypoints=keypoints, keypoint_scores=scores))
+        return preds
+
     def predict(
         self,
         feats: Tuple[Tensor],
@@ -214,8 +226,23 @@ class RTM3DHead(BaseHead):
             batch_pred_z = (_batch_pred_z + _batch_pred_z_flip) * 0.5
         else:
             batch_pred_x, batch_pred_y, batch_pred_z = self.forward(feats)
+        batch_warp_mat = torch.stack([
+            torch.from_numpy(b.metainfo['warp_mat'])
+            for b in batch_data_samples
+        ])
+        batch_camera_param = [
+            b.metainfo['camera_param'] for b in batch_data_samples
+        ]
+        batch_z_max = torch.stack([
+            torch.from_numpy(b.metainfo['z_max']) for b in batch_data_samples
+        ])
+        batch_z_min = torch.stack([
+            torch.from_numpy(b.metainfo['z_min']) for b in batch_data_samples
+        ])
 
-        preds = self.decode((batch_pred_x, batch_pred_y, batch_pred_z))
+        preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
+                            batch_warp_mat, batch_z_max, batch_z_min,
+                            batch_camera_param)
 
         if test_cfg.get('output_heatmaps', False):
             rank, _ = get_dist_info()
