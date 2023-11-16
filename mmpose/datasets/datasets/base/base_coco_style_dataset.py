@@ -8,8 +8,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 from mmengine.dataset import BaseDataset, force_full_init
 from mmengine.fileio import exists, get_local_path, load
-from mmengine.logging import MessageHub, print_log
-from mmengine.utils import ProgressBar, is_list_of
+from mmengine.logging import MessageHub
+from mmengine.utils import is_list_of
 from xtcocotools.coco import COCO
 
 from mmpose.registry import DATASETS
@@ -228,9 +228,7 @@ class BaseCocoStyleDataset(BaseDataset):
 
         instance_list = []
         image_list = []
-        num_imgs = len(self.coco.getImgIds())
-        pbar = ProgressBar(num_imgs // self.sample_interval)
-        print_log(f'Processing {pbar.task_num} images', logger='current')
+
         for img_id in self.coco.getImgIds():
             if img_id % self.sample_interval != 0:
                 continue
@@ -254,7 +252,6 @@ class BaseCocoStyleDataset(BaseDataset):
                     continue
 
                 instance_list.append(instance_info)
-            pbar.update()
         return instance_list, image_list
 
     def parse_data_info(self, raw_data_info: dict) -> Optional[dict]:

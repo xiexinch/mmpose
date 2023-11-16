@@ -34,29 +34,6 @@ class H36MCOCODataset(BaseCocoStyleDataset):
             data_info['z_max'] = np.array([z_max])
         return data_list
 
-    # def parse_data_info(self, raw_data_info: dict) -> dict:
-    #     data_info = super().parse_data_info(raw_data_info)
-    #     keypoints_3d = raw_data_info['raw_ann_info'].get('keypoints_3d', None) # noqa: E501
-    #     if keypoints_3d is None:
-    #         raise ValueError('keypoints_3d is required in data_info')
-    #     _keypoints_3d = np.array(
-    #         keypoints_3d, dtype=np.float32).reshape(1, -1, 4)
-    #     subj, rest = osp.basename(data_info['img_path']).split('_', 1)
-    #     _, rest = rest.split('.', 1)
-    #     camera_name, rest = rest.split('_', 1)
-    #     cam_key = (subj, camera_name)
-    #     camera = SimpleCamera(self.camera_params[cam_key])
-    #     kpt_3d = _keypoints_3d[..., :3]
-    #     kpt_3d_cam = camera.world_to_camera(kpt_3d)
-    #     kpt_3d_pixel, factor = camera_to_image_coord(0, kpt_3d_cam, self.camera_params[cam_key]) # noqa: E501
-    #     keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
-    #     data_info['keypoints_3d_gt'] = kpt_3d_cam
-    #     data_info['keypoints_3d'] = kpt_3d_pixel * 1000
-    #     data_info['keypoints_3d_visible'] = keypoints_3d_visible
-    #     data_info['factor'] = factor
-    #     data_info['camera_param'] = self.camera_params[cam_key]
-    #     return data_info
-
     def parse_data_info(self, raw_data_info: dict) -> dict:
         data_info = super().parse_data_info(raw_data_info)
         keypoints_3d = raw_data_info['raw_ann_info'].get('keypoints_3d', None)
@@ -70,17 +47,13 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         cam_key = (subj, camera_name)
         camera = SimpleCamera(self.camera_params[cam_key])
         kpts_3d = _keypoints_3d[..., :3]
-        # print(kpts_3d)
         kpt_3d_cam = camera.world_to_camera(kpts_3d)
-        # print(kpt_3d_cam)
         kpts_2d = camera.world_to_pixel(kpts_3d)
         kpts_3d_depth = kpt_3d_cam[..., 2]
         kpts_3d_pixel = np.concatenate([kpts_2d, kpts_3d_depth[..., None]],
                                        axis=-1)
-
         keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
 
-        # data_info['keypoints_3d_gt'] = kpts_3d_pixel
         data_info['keypoints_3d_gt'] = kpt_3d_cam
         data_info['keypoints_3d'] = kpts_3d_pixel
         data_info['keypoints_3d_visible'] = keypoints_3d_visible
