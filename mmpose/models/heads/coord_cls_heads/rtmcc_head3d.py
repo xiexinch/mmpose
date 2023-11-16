@@ -292,8 +292,6 @@ class RTM3DHead(BaseHead):
 
         pred_x, pred_y, pred_z = self.forward(feats)
 
-        pred_z = pred_z / 1000
-
         gt_x = torch.cat([
             d.gt_instance_labels.keypoint_x_labels for d in batch_data_samples
         ],
