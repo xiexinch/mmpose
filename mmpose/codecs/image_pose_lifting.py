@@ -139,11 +139,12 @@ class ImagePoseLifting(BaseKeypointCodec):
                   root. Exists if ``remove_root`` and ``save_index``
                   are ``True``.
         """
+        N, K, D = keypoints.shape
         if keypoints_visible is None:
             keypoints_visible = np.ones(keypoints.shape[:2], dtype=np.float32)
 
         if lifting_target is None:
-            lifting_target = [keypoints[0]]
+            lifting_target = np.zeros((N, K, D + 1), dtype=np.float32)
 
         # set initial value for `lifting_target_weight`
         # and `trajectory_weights`
