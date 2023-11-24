@@ -405,9 +405,8 @@ class PoseDetectionLifter(BaseModel):
         return data_samples
 
     def _forward(self,
-                 inputs: torch.Tensor,
-                 data_samples: OptSampleList = None
-                 ) -> torch.Tensor | tuple[torch.Tensor]:
+                 inputs: Tensor,
+                 data_samples: OptSampleList = None) -> Tensor:
         img_feats = self.extract_feats(inputs)
         x, y = self.pose_estimator.head.forward(img_feats)
         keypoints, _ = self.decode_simcc_pred(x, y)
