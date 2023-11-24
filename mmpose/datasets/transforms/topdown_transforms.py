@@ -226,6 +226,8 @@ class TopdownAffine3D(TopdownAffine):
             # transformed_keypoints = np.concatenate(
             #     (transformed_xy, keypoints_z), axis=-1)
             results['transformed_keypoints_3d'] = transformed_keypoints
+        else:
+            results['transformed_keypoints_3d'] = None
 
         results['input_size'] = (w, h, d)
         results['input_center'] = [center[0], center[1], center[0]]

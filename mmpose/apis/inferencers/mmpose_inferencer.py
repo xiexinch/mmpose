@@ -11,6 +11,7 @@ from mmengine.structures import InstanceData
 from .base_mmpose_inferencer import BaseMMPoseInferencer
 from .hand3d_inferencer import Hand3DInferencer
 from .pose2d_inferencer import Pose2DInferencer
+from .pose3d_img_inferencer import Pose3DImageInferencer
 from .pose3d_inferencer import Pose3DInferencer
 
 InstanceList = List[InstanceData]
@@ -84,9 +85,12 @@ class MMPoseInferencer(BaseMMPoseInferencer):
                 self.inferencer = Hand3DInferencer(pose3d, pose3d_weights,
                                                    device, scope, det_model,
                                                    det_weights, det_cat_ids)
+            elif 'rtmpose3d' in pose3d:
+                self.inferencer = Pose3DImageInferencer(
+                    pose3d, pose3d_weights, device, scope, det_model,
+                    det_weights, det_cat_ids)
             else:
                 self.inferencer = Pose3DInferencer(pose3d, pose3d_weights,
-                                                   pose2d, pose2d_weights,
                                                    device, scope, det_model,
                                                    det_weights, det_cat_ids)
         elif pose2d is not None:

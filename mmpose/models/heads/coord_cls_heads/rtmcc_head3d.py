@@ -1,17 +1,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import warnings
 from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
-from mmengine.dist import get_dist_info
-from mmengine.structures import InstanceData, PixelData
+from mmengine.structures import InstanceData
 from torch import Tensor, nn
 
-from mmpose.codecs.utils import get_simcc_normalized
 from mmpose.evaluation.functional import keypoint_mpjpe
 from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
-from mmpose.models.utils.tta import flip_vectors
 from mmpose.registry import KEYPOINT_CODECS, MODELS
 from mmpose.utils.tensor_utils import to_numpy
 from mmpose.utils.typing import (ConfigType, InstanceList, OptConfigType,
@@ -166,12 +162,25 @@ class RTM3DHead(BaseHead):
 
     def decode(self, batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat,
                batch_z_max, batch_z_min, camera_params):
-        batch_outputs = to_numpy((batch_pred_x, batch_pred_y, batch_pred_z,
-                                  batch_warp_mat, batch_z_max, batch_z_min),
-                                 unzip=True)
+        batch_pred_x = to_numpy(batch_pred_x, unzip=True)
+        batch_pred_y = to_numpy(batch_pred_y, unzip=True)
+        batch_pred_z = to_numpy(batch_pred_z, unzip=True)
+        batch_warp_mat = to_numpy(batch_warp_mat, unzip=True)
+        batch_inputs = (batch_pred_x, batch_pred_y, batch_pred_z,
+                        batch_warp_mat)
+        if batch_z_max is not None:
+            batch_z_max = to_numpy(batch_z_max)
+        if batch_z_min is not None:
+            batch_z_min = to_numpy(batch_z_min)
         preds = []
-        for output, camera_param in zip(batch_outputs, camera_params):
-            keypoints, scores = self.decoder.decode(*output, camera_param)
+        for i, output in enumerate(zip(*batch_inputs)):
+            # print(output)
+            camera_param = camera_params[
+                i] if camera_params is not None else None
+            z_min = batch_z_min[i] if batch_z_min is not None else None
+            z_max = batch_z_max[i] if batch_z_max is not None else None
+            keypoints, scores = self.decoder.decode(*output, z_min, z_max,
+                                                    camera_param)
             preds.append(
                 InstanceData(keypoints=keypoints, keypoint_scores=scores))
         return preds
@@ -205,82 +214,39 @@ class RTM3DHead(BaseHead):
                 - keypoint_y_labels (np.ndarray, optional): The predicted 1-D
                     intensity distribution in the y direction
         """
-
-        if test_cfg.get('flip_test', False):
-            # TTA: flip test -> feats = [orig, flipped]
-            assert isinstance(feats, list) and len(feats) == 2
-            flip_indices = batch_data_samples[0].metainfo['flip_indices']
-            _feats, _feats_flip = feats
-
-            _batch_pred_x, _batch_pred_y, _batch_pred_z = self.forward(_feats)
-
-            _batch_pred_x_flip, _batch_pred_y_flip, _batch_pred_z_flip\
-                = self.forward(_feats_flip)
-            _batch_pred_x_flip, _batch_pred_y_flip = flip_vectors(
-                _batch_pred_x_flip,
-                _batch_pred_y_flip,
-                flip_indices=flip_indices)
-
-            batch_pred_x = (_batch_pred_x + _batch_pred_x_flip) * 0.5
-            batch_pred_y = (_batch_pred_y + _batch_pred_y_flip) * 0.5
-            batch_pred_z = (_batch_pred_z + _batch_pred_z_flip) * 0.5
-        else:
-            batch_pred_x, batch_pred_y, batch_pred_z = self.forward(feats)
+        batch_pred_x, batch_pred_y, batch_pred_z = self.forward(feats)
         batch_warp_mat = torch.stack([
             torch.from_numpy(b.metainfo['warp_mat'])
             for b in batch_data_samples
         ])
-        batch_camera_param = [
-            b.metainfo['camera_param'] for b in batch_data_samples
-        ]
-        batch_z_max = torch.stack([
-            torch.from_numpy(b.metainfo['z_max']) for b in batch_data_samples
-        ])
-        batch_z_min = torch.stack([
-            torch.from_numpy(b.metainfo['z_min']) for b in batch_data_samples
-        ])
+        if batch_data_samples[0].get('camera_param', None) is not None:
+            batch_camera_param = [
+                b.metainfo['camera_param'] for b in batch_data_samples
+            ]
+        else:
+            batch_camera_param = None
+
+        if batch_data_samples[0].get('z_max', None) is not None:
+            batch_z_max = torch.stack([
+                torch.from_numpy(b.metainfo['z_max'])
+                for b in batch_data_samples
+            ])
+        else:
+            batch_z_max = None
+
+        if batch_data_samples[0].get('z_min', None) is not None:
+            batch_z_min = torch.stack([
+                torch.from_numpy(b.metainfo['z_min'])
+                for b in batch_data_samples
+            ])
+        else:
+            batch_z_min = None
 
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
                             batch_warp_mat, batch_z_max, batch_z_min,
                             batch_camera_param)
 
-        if test_cfg.get('output_heatmaps', False):
-            rank, _ = get_dist_info()
-            if rank == 0:
-                warnings.warn('The predicted simcc values are normalized for '
-                              'visualization. This may cause discrepancy '
-                              'between the keypoint scores and the 1D heatmaps'
-                              '.')
-
-            # normalize the predicted 1d distribution
-            batch_pred_x = get_simcc_normalized(batch_pred_x)
-            batch_pred_y = get_simcc_normalized(batch_pred_y)
-            batch_pred_z = get_simcc_normalized(batch_pred_z)
-
-            B, K, _ = batch_pred_x.shape
-            # B, K, Wx -> B, K, Wx, 1
-            x = batch_pred_x.reshape(B, K, 1, -1)
-            # B, K, Wy -> B, K, 1, Wy
-            y = batch_pred_y.reshape(B, K, -1, 1)
-            # B, K, Wz -> B, K, 1, Wz
-            z = batch_pred_z.reshape(B, K, -1, 1)
-            # B, K, Wx, Wy, Wz
-            batch_heatmaps = x * y * z
-            pred_fields = [
-                PixelData(heatmaps=hm) for hm in batch_heatmaps.detach()
-            ]
-
-            for pred_instances, pred_x, pred_y, pred_z in zip(
-                    preds, to_numpy(batch_pred_x), to_numpy(batch_pred_y),
-                    to_numpy(batch_pred_z)):
-
-                pred_instances.keypoint_x_labels = pred_x[None]
-                pred_instances.keypoint_y_labels = pred_y[None]
-                pred_instances.keypoint_z_labels = pred_z[None]
-
-            return preds, pred_fields
-        else:
-            return preds
+        return preds
 
     def loss(
         self,
