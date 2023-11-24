@@ -15,7 +15,7 @@ class UBody3DCOCODataset(BaseCocoStyleDataset):
 
     def parse_data_info(self, raw_data_info: dict) -> dict:
         ann = raw_data_info['raw_ann_info']
-        img = raw_data_info['img_info']
+        img = raw_data_info['raw_img_info']
 
         if 'bbox' not in ann or 'keypoints' not in ann:
             return None
