@@ -3,8 +3,8 @@ import copy
 
 import numpy as np
 
+from mmpose.codecs.utils import pixel_to_camera
 from mmpose.registry import DATASETS
-from mmpose.utils import SimpleCamera
 from ..base import BaseCocoStyleDataset
 
 
@@ -50,12 +50,13 @@ class UBody3DCOCODataset(BaseCocoStyleDataset):
             area = np.array(area, dtype=np.float32)
 
         camera_param = ann['camera_param']
+        fx, fy = camera_param['focal']
+        cx, cy = camera_param['princpt']
         camera_param = {
             'f': camera_param['focal'],
             'c': camera_param['princpt']
         }
-        camera = SimpleCamera(camera_param)
-        keypoints_3d_camera = camera.pixel_to_camera(keypoints_3d)
+        keypoints_3d_camera = pixel_to_camera(keypoints_3d, fx, fy, cx, cy)
 
         data_info = {
             'img_id': ann['image_id'],
