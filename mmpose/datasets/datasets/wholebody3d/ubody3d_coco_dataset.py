@@ -9,7 +9,7 @@ from ..base import BaseCocoStyleDataset
 @DATASETS.register_module()
 class UBody3DCOCODataset(BaseCocoStyleDataset):
 
-    METAINFO: dict = dict(from_file='configs/_base_/datasets/ubody.py')
+    METAINFO: dict = dict(from_file='configs/_base_/datasets/ubody3d.py')
 
     def parse_data_info(self, raw_data_info: dict) -> dict:
         data_info = super().parse_data_info(raw_data_info)

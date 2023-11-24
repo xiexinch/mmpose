@@ -189,7 +189,7 @@ train_dataloader = dict(
         type='CombinedDataset',
         datasets=train_datasets,
         pipeline=train_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/ubody.py'),
+        metainfo=dict(from_file='configs/_base_/datasets/ubody3d.py'),
         test_mode=False))
 val_dataloader = dict(
     batch_size=256,
@@ -201,7 +201,7 @@ val_dataloader = dict(
         type='CombinedDataset',
         datasets=val_datasets,
         pipeline=val_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/ubody.py'),
+        metainfo=dict(from_file='configs/_base_/datasets/ubody3d.py'),
         test_mode=True))
 test_dataloader = val_dataloader
 
