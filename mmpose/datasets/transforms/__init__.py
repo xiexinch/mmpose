@@ -6,7 +6,8 @@ from .common_transforms import (Albumentation, FilterAnnotations,
                                 GenerateTarget, GetBBoxCenterScale,
                                 PhotometricDistortion, RandomBBoxTransform,
                                 RandomFlip, RandomHalfBody, YOLOXHSVRandomAug)
-from .converting import KeypointConverter, SingleHandConverter
+from .converting import (KeypointCombiner, KeypointConverter,
+                         SingleHandConverter)
 from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
 from .loading import LoadImage
@@ -22,5 +23,5 @@ __all__ = [
     'GenerateTarget', 'KeypointConverter', 'RandomFlipAroundRoot',
     'FilterAnnotations', 'YOLOXHSVRandomAug', 'YOLOXMixUp', 'Mosaic',
     'BottomupRandomCrop', 'BottomupRandomChoiceResize', 'HandRandomFlip',
-    'SingleHandConverter', 'TopdownAffine3D'
+    'SingleHandConverter', 'TopdownAffine3D', 'KeypointCombiner'
 ]

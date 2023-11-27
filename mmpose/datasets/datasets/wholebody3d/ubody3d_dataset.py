@@ -189,17 +189,23 @@ class UBody3dDataset(BaseMocapDataset):
             kpts_3d = np.zeros((len(anns), num_keypoints, 3), dtype=np.float32)
             keypoints_visible = np.zeros((len(anns), num_keypoints, 1),
                                          dtype=np.float32)
+            scales = np.zeros(len(anns), dtype=np.float32)
+            centers = np.zeros((len(anns), 2), dtype=np.float32)
+
             for j, ann in enumerate(anns):
                 img_ids.append(ann['image_id'])
                 kpts[j] = np.array(ann['keypoints'], dtype=np.float32)
                 kpts_3d[j] = np.array(ann['keypoints_3d'], dtype=np.float32)
                 keypoints_visible[j] = np.array(
                     ann['keypoints_valid'], dtype=np.float32)
+                if 'scale' in ann:
+                    scales[j] = ann['scale']
+                if 'center' in ann:
+                    centers[j] = ann['center']
+
             imgs = self.ann_data.loadImgs(img_ids)
             keypoints_visible = keypoints_visible.squeeze(-1)
 
-            scales = np.zeros(len(imgs), dtype=np.float32)
-            centers = np.zeros((len(imgs), 2), dtype=np.float32)
             img_paths = np.array([img['file_name'] for img in imgs])
             factors = np.zeros((kpts_3d.shape[0], ), dtype=np.float32)
 

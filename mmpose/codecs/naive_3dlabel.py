@@ -14,7 +14,9 @@ from .utils import pixel_to_camera
 @KEYPOINT_CODECS.register_module()
 class Naive3DLabel(BaseKeypointCodec):
 
-    auxiliary_encode_keys = {'transformed_keypoints_3d'}
+    auxiliary_encode_keys = {
+        'transformed_keypoints_3d', 'camera_param', 'keypoints_3d'
+    }
 
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
@@ -39,8 +41,8 @@ class Naive3DLabel(BaseKeypointCodec):
                  label_smooth_weight: float = 0.0,
                  normalize: bool = True,
                  rootrel: bool = False,
-                 camera_param: Optional[dict] = None,
-                 defaut_depth: Tuple[float] = None) -> None:
+                 test_mode: bool = False,
+                 gt_field: str = 'keypoints_3d') -> None:
         super().__init__()
         self.input_size = input_size
         self.simcc_split_ratio = simcc_split_ratio
@@ -53,38 +55,35 @@ class Naive3DLabel(BaseKeypointCodec):
         else:
             self.sigma = np.array(sigma, dtype=np.float32)
 
-        if camera_param is None:
-            self.camera_param = dict(
-                f=np.array([[1149.67569987], [1148.79896857]]),
-                c=np.array([[519.81583718], [515.45148698]]))
-        else:
-            self.camera_param = camera_param
-
-        if defaut_depth is None:
-            z_min, z_max = 2, 8
-        else:
-            z_min, z_max = defaut_depth
-        self.z_min = z_min
-        self.z_max = z_max
+        self.test_mode = test_mode
+        self.gt_field = gt_field
 
     def encode(self,
                keypoints: np.ndarray,
+               keypoints_3d: np.ndarray,
+               camera_param: dict,
                transformed_keypoints_3d: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
-        if transformed_keypoints_3d is not None:
+        if not self.test_mode:
             x, y, z, weights = self._generate_gaussian(
                 transformed_keypoints_3d, keypoints_visible)  # noqa
+            encoded = dict(
+                keypoint_x_labels=x,
+                keypoint_y_labels=y,
+                keypoint_z_labels=z,
+                keypoint_weights=weights,
+                transformed_keypoints_3d=transformed_keypoints_3d,
+                keypoints_3d_visible=keypoints_visible,
+            )
         else:
-            x, y, z, weights = None, None, None, None
-        encoded = dict(
-            keypoint_x_labels=x,
-            keypoint_y_labels=y,
-            keypoint_z_labels=z,
-            keypoint_weights=weights,
-            transformed_keypoints_3d=transformed_keypoints_3d,
-            keypoints_3d_visible=keypoints_visible,
-        )
+            fx, fy = camera_param['f']
+            cx, cy = camera_param['c']
+            keypoints_3d_camera = pixel_to_camera(keypoints_3d, fx, fy, cx, cy)
+            encoded = dict(
+                keypoints_3d_gt=keypoints_3d_camera,
+                keypoints_3d_visible=keypoints_visible,
+                instance_mapping_table=self.instance_mapping_table)
         return encoded
 
     def decode(self,
