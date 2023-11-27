@@ -176,7 +176,7 @@ for scene in scenes:
         data_prefix=dict(img='images/'),
         pipeline=[
             dict(
-                type='KeypointConverter',
+                type='KeypointCombiner',
                 num_keypoints=17,
                 mapping=[
                     ((11, 12), 0),
