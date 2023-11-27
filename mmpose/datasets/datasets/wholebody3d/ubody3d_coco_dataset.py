@@ -1,5 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import copy
+from typing import List
 
 import numpy as np
 
@@ -79,3 +80,8 @@ class UBody3DCOCODataset(BaseCocoStyleDataset):
             data_info['crowd_index'] = img['crowdIndex']
 
         return data_info
+
+    def load_data_list(self) -> List[dict]:
+        data_list = super().load_data_list()
+        self.coco = None
+        return data_list

@@ -32,6 +32,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         for data_info in data_list:
             data_info['z_min'] = np.array([z_min])
             data_info['z_max'] = np.array([z_max])
+        self.coco = None
         return data_list
 
     def parse_data_info(self, raw_data_info: dict) -> dict:
