@@ -153,6 +153,7 @@ val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine3D', input_size=val_codec['input_size']),
+    dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
         meta_keys=('warp_mat', 'camera_param', 'z_max', 'z_min'))
@@ -224,9 +225,9 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type=dataset_type,
+        type='H36MCOCODataset',
         ann_file='annotation_body2d/h36m_test_fps50.json',
-        data_root=data_root,
+        data_root='data/h36m/',
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=val_pipeline))
