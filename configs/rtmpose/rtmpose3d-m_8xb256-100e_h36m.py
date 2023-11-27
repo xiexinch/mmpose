@@ -51,7 +51,8 @@ val_codec = dict(
     simcc_split_ratio=2.0,
     sigma=(4.9, 5.66, 4.9),
     normalize=False,
-    rootrel=True)
+    test_mode=True,
+    gt_field='keypoints_3d_gt')
 
 # model settings
 model = dict(
@@ -216,7 +217,7 @@ train_dataloader = dict(
     ))
 val_dataloader = dict(
     batch_size=256,
-    num_workers=2,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
@@ -226,9 +227,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
-        pipeline=val_pipeline,
-        # sample_interval=2000
-    ))
+        pipeline=val_pipeline))
 test_dataloader = val_dataloader
 
 # hooks

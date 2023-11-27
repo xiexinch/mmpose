@@ -50,7 +50,8 @@ val_codec = dict(
     simcc_split_ratio=2.0,
     sigma=(4.9, 5.66, 4.9),
     normalize=False,
-    rootrel=True)
+    test_mode=True,
+    gt_field='keypoints_3d_gt')
 
 # model settings
 model = dict(
@@ -223,11 +224,12 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type='CombinedDataset',
-        datasets=val_datasets,
-        pipeline=val_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
-        test_mode=True))
+        type=dataset_type,
+        ann_file='annotation_body2d/h36m_test_fps50.json',
+        data_root=data_root,
+        data_prefix=dict(img='images/'),
+        camera_param_file='annotation_body3d/cameras.pkl',
+        pipeline=val_pipeline))
 test_dataloader = val_dataloader
 
 # evaluators
