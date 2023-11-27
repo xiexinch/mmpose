@@ -4,7 +4,7 @@ _base_ = ['../_base_/default_runtime.py']
 max_epochs = 100
 base_lr = 4e-3
 
-train_cfg = dict(max_epochs=max_epochs, val_interval=10)
+train_cfg = dict(max_epochs=max_epochs, val_interval=1)
 randomness = dict(seed=2023)
 
 # optimizer
@@ -152,12 +152,14 @@ val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine3D', input_size=val_codec['input_size']),
-    dict(type='PackPoseInputs')
+    dict(
+        type='PackPoseInputs',
+        meta_keys=('warp_mat', 'camera_param', 'z_max', 'z_min'))
 ]
 
 scenes = [
     'Magic_show',
-    'Entertainment',
+    # 'Entertainment',
     # 'ConductMusic', 'Online_class', 'TalkShow',
     # 'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
     # 'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
@@ -166,7 +168,7 @@ skip_scenes = ['Speech', 'Movie']
 
 train_datasets, val_datasets = [], []
 for scene in scenes:
-    train_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
+    train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
     val_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     train_dataset = dict(
         type=dataset_type,
@@ -178,24 +180,12 @@ for scene in scenes:
             dict(
                 type='KeypointCombiner',
                 num_keypoints=17,
-                mapping=[
-                    ((11, 12), 0),
-                    (12, 1),
-                    (14, 2),
-                    (16, 3),
-                    (11, 4),
-                    (13, 5),
-                    (15, 6),
-                    ((5, 6, 11, 12), 7),
-                    ((5, 6), 8),
-                    (0, 9),
-                    ((1, 2), 10),
-                    (5, 11),
-                    (7, 12),
-                    (9, 13),
-                    (6, 14),
-                    (8, 15),
-                    (10, 16),
+                mapping=[((11, 12), 0), (12, 1), (14, 2), (16, 3), (11, 4),
+                         (13, 5), (15, 6), ((5, 6, 11, 12), 7), ((5, 6), 8),
+                         (0, 9), ((1, 2), 10), (5, 11), (7, 12), (9, 13),
+                         (6, 14), (8, 15), (10, 16)],
+                flip_indices=[
+                    0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
         ])
     train_datasets.append(train_dataset)
@@ -213,7 +203,7 @@ train_dataloader = dict(
         type='CombinedDataset',
         datasets=train_datasets,
         pipeline=train_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/ubody3d.py'),
+        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
         test_mode=False))
 val_dataloader = dict(
     batch_size=256,
@@ -225,13 +215,23 @@ val_dataloader = dict(
         type='CombinedDataset',
         datasets=val_datasets,
         pipeline=val_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/ubody3d.py'),
+        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
         test_mode=True))
 test_dataloader = val_dataloader
 
 # evaluators
 val_evaluator = [
-    dict(type='SimpleMPJPE', mode='mpjpe'),
-    dict(type='SimpleMPJPE', mode='p-mpjpe')
+    dict(
+        type='SimpleMPJPE',
+        mode='mpjpe',
+        pred_field='keypoints',
+        gt_field='keypoints_3d_cam',
+        gt_mask_field='keypoints_visible'),
+    dict(
+        type='SimpleMPJPE',
+        mode='p-mpjpe',
+        pred_field='keypoints',
+        gt_field='keypoints_3d_cam',
+        gt_mask_field='keypoints_visible')
 ]
 test_evaluator = val_evaluator

@@ -239,11 +239,14 @@ class SingleHandConverter(BaseTransform):
 @TRANSFORMS.register_module()
 class KeypointCombiner(BaseTransform):
 
-    def __init__(self, num_keypoints: int,
+    def __init__(self,
+                 num_keypoints: int,
                  mapping: Union[List[Tuple[int, int]], List[Tuple[Tuple,
-                                                                  int]]]):
+                                                                  int]]],
+                 flip_indices: List = None):
         self.num_keypoints = num_keypoints
         self.source_index, self.target_index = zip(*mapping)
+        self.flip_indices = flip_indices
 
     def transform(self, results: dict) -> dict:
         """Transforms the keypoint results to match the target keypoints."""
@@ -257,10 +260,6 @@ class KeypointCombiner(BaseTransform):
             src_kpts_3d = results['keypoints_3d']
             new_keypoints_3d = np.zeros((num_instances, self.num_keypoints, 3),
                                         dtype=np.float32)
-        flip_indices = results.get('flip_indices', None)
-        if flip_indices is not None:
-            new_flip_indices = [0] * len(flip_indices)
-
         new_keypoints = np.zeros((num_instances, self.num_keypoints, 2),
                                  dtype=np.float32)
         new_keypoints_visible = np.zeros((num_instances, self.num_keypoints),
@@ -269,27 +268,27 @@ class KeypointCombiner(BaseTransform):
         for i, (src_idx, tgt_idx) in enumerate(
                 zip(self.source_index, self.target_index)):
             if isinstance(src_idx, (list, tuple)):
-                new_keypoints[tgt_idx, :] = src_kpts[src_idx, :].mean(axis=0)
-                if all(src_kpts_visible[src_idx, :] == 1):
-                    new_keypoints_visible[tgt_idx, :] = 1
+                new_keypoints[...,
+                              tgt_idx, :] = src_kpts[...,
+                                                     src_idx, :].mean(axis=1)
+                if src_kpts_visible[..., src_idx].all() == 1:
+                    new_keypoints_visible[..., tgt_idx] = 1
                 if 'keypoints_3d' in results:
-                    new_keypoints_3d[tgt_idx, :] = src_kpts_3d[
-                        src_idx, :].mean(axis=0)
-                if flip_indices is not None:
-                    new_flip_indices[tgt_idx] = tgt_idx
+                    new_keypoints_3d[..., tgt_idx, :] = src_kpts_3d[
+                        ..., src_idx, :].mean(axis=1)
             else:
-                new_keypoints[tgt_idx, :] = src_kpts[src_idx, :]
-                new_keypoints_visible[tgt_idx, :] = src_kpts_visible[
-                    src_idx, :]
+                new_keypoints[..., tgt_idx, :] = src_kpts[..., src_idx, :]
+                new_keypoints_visible[..., tgt_idx] = src_kpts_visible[...,
+                                                                       src_idx]
                 if 'keypoints_3d' in results:
-                    new_keypoints_3d[tgt_idx, :] = src_kpts_3d[src_idx, :]
-                if flip_indices is not None:
-                    new_flip_indices[tgt_idx] = flip_indices[src_idx]
+                    new_keypoints_3d[..., tgt_idx, :] = src_kpts_3d[...,
+                                                                    src_idx, :]
 
         results['keypoints'] = new_keypoints
         results['keypoints_visible'] = new_keypoints_visible
         if 'keypoints_3d' in results:
             results['keypoints_3d'] = new_keypoints_3d
-        if flip_indices is not None:
-            results['flip_indices'] = new_flip_indices
+        if self.flip_indices is not None:
+            results['flip_indices'] = self.flip_indices
+
         return results
