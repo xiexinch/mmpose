@@ -31,12 +31,13 @@ class UBody3DCOCODataset(BaseCocoStyleDataset):
 
         bbox = np.array([x1, y1, x2, y2], dtype=np.float32).reshape(1, 4)
 
-        keypoints = np.array(ann['keypoints'], dtype=np.float32).reshape(-1, 2)
+        keypoints = np.array(
+            ann['keypoints'], dtype=np.float32).reshape(1, -1, 2)
         keypoints_visible = np.array(
-            ann['keypoints_valid'], dtype=np.float32).reshape(-1, 1)
+            ann['keypoints_valid'], dtype=np.float32).reshape(1, -1, 1)
 
         keypoints_3d = np.array(
-            ann['keypoints_3d'], dtype=np.float32).reshape(-1, 3)
+            ann['keypoints_3d'], dtype=np.float32).reshape(1, -1, 3)
 
         if 'num_keypoints' in ann:
             num_keypoints = ann['num_keypoints']

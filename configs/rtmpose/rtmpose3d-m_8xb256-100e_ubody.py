@@ -120,7 +120,7 @@ train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
+    # dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
     dict(type='TopdownAffine3D', input_size=train_codec['input_size']),
@@ -157,7 +157,8 @@ val_pipeline = [
 
 scenes = [
     'Magic_show',
-    # 'Entertainment', 'ConductMusic', 'Online_class', 'TalkShow',
+    'Entertainment',
+    # 'ConductMusic', 'Online_class', 'TalkShow',
     # 'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
     # 'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
 ]
@@ -165,7 +166,7 @@ skip_scenes = ['Speech', 'Movie']
 
 train_datasets, val_datasets = [], []
 for scene in scenes:
-    train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
+    train_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     val_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     train_dataset = dict(
         type=dataset_type,
@@ -173,7 +174,30 @@ for scene in scenes:
         ann_file=train_ann,
         data_mode=data_mode,
         data_prefix=dict(img='images/'),
-        pipeline=[])
+        pipeline=[
+            dict(
+                type='KeypointConverter',
+                num_keypoints=17,
+                mapping=[
+                    (11, 12),  # 0
+                    12,  # 1
+                    14,  # 2
+                    16,  # 3
+                    11,  # 4
+                    13,  # 5
+                    15,  # 6
+                    (5, 6, 11, 12),  # 7
+                    (5, 6),  # 8
+                    0,  # 9
+                    (1, 2),  # 10
+                    5,  # 11
+                    7,  # 12
+                    9,  # 13
+                    6,  # 14
+                    8,  # 15
+                    10  # 16
+                ])
+        ])
     train_datasets.append(train_dataset)
     if scene not in skip_scenes:
         val_dataset = train_dataset.copy()
@@ -182,7 +206,7 @@ for scene in scenes:
 
 train_dataloader = dict(
     batch_size=256,
-    num_workders=4,
+    num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
