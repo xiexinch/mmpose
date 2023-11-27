@@ -236,13 +236,13 @@ val_evaluator = [
         type='SimpleMPJPE',
         mode='mpjpe',
         pred_field='keypoints',
-        gt_field='keypoints_3d_cam',
+        gt_field='keypoints_3d_gt',
         gt_mask_field='keypoints_visible'),
     dict(
         type='SimpleMPJPE',
         mode='p-mpjpe',
         pred_field='keypoints',
-        gt_field='keypoints_3d_cam',
+        gt_field='keypoints_3d_gt',
         gt_mask_field='keypoints_visible')
 ]
 test_evaluator = val_evaluator
