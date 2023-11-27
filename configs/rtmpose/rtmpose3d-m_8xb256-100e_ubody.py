@@ -158,11 +158,9 @@ val_pipeline = [
 ]
 
 scenes = [
-    'Magic_show',
-    # 'Entertainment',
-    # 'ConductMusic', 'Online_class', 'TalkShow',
-    # 'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
-    # 'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
+    'Magic_show', 'Entertainment', 'ConductMusic', 'Online_class', 'TalkShow',
+    'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
+    'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
 ]
 skip_scenes = ['Speech', 'Movie']
 
