@@ -121,7 +121,7 @@ train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='RandomFlip', direction='horizontal'),
-    # dict(type='RandomHalfBody'),
+    dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
     dict(type='TopdownAffine3D', input_size=train_codec['input_size']),
@@ -203,7 +203,9 @@ train_datasets.append(h36m_train_dataset)
 
 train_dataloader = dict(
     batch_size=256,
-    num_workers=4,
+    num_workers=10,
+    prefetch_factor=4,
+    pin_memory=True,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
