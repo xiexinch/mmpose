@@ -233,6 +233,23 @@ val_dataloader = dict(
         pipeline=val_pipeline))
 test_dataloader = val_dataloader
 
+# hooks
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        save_best='MPJPE',
+        rule='less',
+        max_keep_ckpts=1))
+
+custom_hooks = [
+    dict(
+        type='EMAHook',
+        ema_type='ExpMomentumEMA',
+        momentum=0.0002,
+        update_buffers=True,
+        priority=49)
+]
+
 # evaluators
 val_evaluator = [
     dict(
@@ -240,12 +257,12 @@ val_evaluator = [
         mode='mpjpe',
         pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_visible'),
+        gt_mask_field='keypoints_3d_visible'),
     dict(
         type='SimpleMPJPE',
         mode='p-mpjpe',
         pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_visible')
+        gt_mask_field='keypoints_3d_visible')
 ]
 test_evaluator = val_evaluator

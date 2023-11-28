@@ -4,7 +4,7 @@ _base_ = ['../_base_/default_runtime.py']
 max_epochs = 100
 base_lr = 4e-3
 
-train_cfg = dict(max_epochs=max_epochs, val_interval=1)
+train_cfg = dict(max_epochs=max_epochs, val_interval=10)
 randomness = dict(seed=2023)
 
 # optimizer
@@ -212,13 +212,30 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type=dataset_type,
+        type='H36MCOCODataset',
         ann_file='annotation_body2d/h36m_test_fps50.json',
-        data_root=data_root,
+        data_root='data/h36m/',
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=val_pipeline))
 test_dataloader = val_dataloader
+
+# hooks
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        save_best='MPJPE',
+        rule='less',
+        max_keep_ckpts=1))
+
+custom_hooks = [
+    dict(
+        type='EMAHook',
+        ema_type='ExpMomentumEMA',
+        momentum=0.0002,
+        update_buffers=True,
+        priority=49)
+]
 
 # evaluators
 val_evaluator = [
@@ -227,12 +244,12 @@ val_evaluator = [
         mode='mpjpe',
         pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_visible'),
+        gt_mask_field='keypoints_3d_visible'),
     dict(
         type='SimpleMPJPE',
         mode='p-mpjpe',
         pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_visible')
+        gt_mask_field='keypoints_3d_visible')
 ]
 test_evaluator = val_evaluator
