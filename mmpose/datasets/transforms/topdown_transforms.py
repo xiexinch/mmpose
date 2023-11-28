@@ -204,12 +204,11 @@ class TopdownAffine3D(TopdownAffine):
 
         if results.get('keypoints_3d', None) is not None:
             transformed_keypoints = results['keypoints_3d'].copy()
-            # 对3D关键点的(x, y)部分应用仿射变换
+
             keypoints_xy = transformed_keypoints[..., :2]
             keypoints_z = transformed_keypoints[..., 2:3]
             transformed_xy = cv2.transform(keypoints_xy, warp_mat)
-            # 将 z 轴缩放到 (0, d)
-            # 1. 按照每个人缩放
+
             z_max = np.max(results['keypoints_3d'][..., 2:])
             z_min = np.min(results['keypoints_3d'][..., 2:])
             transformed_z = (keypoints_z - z_min) / (z_max - z_min) * d
@@ -218,13 +217,6 @@ class TopdownAffine3D(TopdownAffine):
             results['z_max'] = np.array([z_max])
             results['z_min'] = np.array([z_min])
 
-            # 2. 按照数据集缩放
-            # transformed_z = (keypoints_z - results['z_min']) / (results['z_max'] - results['z_min']) * d # noqa: E501
-            # transformed_keypoints = np.concatenate(
-            #     (transformed_xy, transformed_z), axis=-1)
-            # 不处理 z
-            # transformed_keypoints = np.concatenate(
-            #     (transformed_xy, keypoints_z), axis=-1)
             results['transformed_keypoints_3d'] = transformed_keypoints
         else:
             results['transformed_keypoints_3d'] = None

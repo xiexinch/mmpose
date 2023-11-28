@@ -11,6 +11,7 @@ from .motionbert_label import MotionBERTLabel
 from .msra_heatmap import MSRAHeatmap
 from .naive_3dlabel import Naive3DLabel
 from .regression_label import RegressionLabel
+from .rtmpose3d_label import RTMPose3DLabel
 from .simcc_label import SimCCLabel
 from .spr import SPR
 from .udp_heatmap import UDPHeatmap
@@ -21,5 +22,5 @@ __all__ = [
     'SimCCLabel', 'IntegralRegressionLabel', 'AssociativeEmbedding', 'SPR',
     'DecoupledHeatmap', 'VideoPoseLifting', 'ImagePoseLifting',
     'MotionBERTLabel', 'YOLOXPoseAnnotationProcessor', 'EDPoseLabel',
-    'Hand3DHeatmap', 'Naive3DLabel'
+    'Hand3DHeatmap', 'Naive3DLabel', 'RTMPose3DLabel'
 ]
