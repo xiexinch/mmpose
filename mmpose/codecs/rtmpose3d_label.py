@@ -35,6 +35,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
                  input_size: tuple,
                  simcc_split_ratio: float = 2.0,
                  sigma: Union[float, int, Tuple[float]] = 6.0,
+                 normalize: bool = True,
                  test_mode: bool = False,
                  gt_field: str = 'keypoints_3d',
                  camera_param: dict = None) -> None:
@@ -46,6 +47,8 @@ class RTMPose3DLabel(BaseKeypointCodec):
             self.sigma = np.array([sigma, sigma, sigma], dtype=np.float32)
         else:
             self.sigma = np.array(sigma, dtype=np.float32)
+
+        self.normalize = normalize
 
         self.test_mode = test_mode
         self.gt_field = gt_field
@@ -79,7 +82,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
             encoded = dict(
                 keypoints_3d_gt=keypoints_3d_camera,
                 keypoints_3d_visible=keypoints_visible)
-        encoded.update('instance_mapping_table', self.instance_mapping_table)
+        encoded.update({'instance_mapping_table': self.instance_mapping_table})
         return encoded
 
     def decode(self,
@@ -243,11 +246,9 @@ def get_simcc_maximum(simcc_x: np.ndarray, simcc_y: np.ndarray,
     locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
     max_val_x = np.amax(simcc_x, axis=1)
     max_val_y = np.amax(simcc_y, axis=1)
-    # max_val_z = np.amax(simcc_z, axis=1)
-    # vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
-    mask = max_val_x > max_val_y
-    max_val_x[mask] = max_val_y[mask]
-    vals = max_val_x
+    max_val_z = np.amax(simcc_z, axis=1)
+
+    vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
     locs[vals <= 0.] = -1
 
     if N:

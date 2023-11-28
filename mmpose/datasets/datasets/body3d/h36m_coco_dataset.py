@@ -34,7 +34,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         _keypoints_3d = np.array(
             keypoints_3d, dtype=np.float32).reshape(1, -1, 4)
         keypoints_camera, keypoints_2d, cam_key = self._keypoint_world_to_gt(
-            _keypoints_3d, data_info['img_path'])
+            _keypoints_3d, self.camera_params, data_info['img_path'])
         keypoints_depth = keypoints_camera[..., 2]
         keypoints_pixel = np.concatenate(
             [keypoints_2d, keypoints_depth[..., None]], axis=-1)
@@ -46,7 +46,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         data_info['camera_param'] = self.camera_params[cam_key]
         return data_info
 
-    def _keypoint_world_to_gt(keypoints, camera_params, image_name=None):
+    def _keypoint_world_to_gt(self, keypoints, camera_params, image_name=None):
         """Project 3D keypoints from the world space to the camera space.
 
         Args:
