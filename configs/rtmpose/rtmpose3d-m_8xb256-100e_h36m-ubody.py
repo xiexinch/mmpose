@@ -166,10 +166,9 @@ scenes = [
 ]
 skip_scenes = ['Speech', 'Movie']
 
-train_datasets, val_datasets = [], []
+train_datasets = []
 for scene in scenes:
     train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
-    val_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     train_dataset = dict(
         type=dataset_type,
         data_root=data_root,
@@ -187,12 +186,9 @@ for scene in scenes:
                 flip_indices=[
                     0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
-        ])
+        ],
+        sample_interval=10)
     train_datasets.append(train_dataset)
-    if scene not in skip_scenes:
-        val_dataset = train_dataset.copy()
-        val_dataset.update({'ann_file': val_ann})
-        val_datasets.append(val_dataset)
 
 h36m_train_dataset = dict(
     type='H36MCOCODataset',
@@ -200,12 +196,10 @@ h36m_train_dataset = dict(
     data_root='data/h36m/',
     data_prefix=dict(img='images/'),
     camera_param_file='annotation_body3d/cameras.pkl',
-    pipeline=[])
-h36m_val_dataset = h36m_train_dataset.copy()
-h36m_val_dataset.update({'ann_file': 'annotation_body2d/h36m_test_fps50.json'})
+    pipeline=[],
+    sample_interval=10)
 
 train_datasets.append(h36m_train_dataset)
-val_datasets.append(h36m_val_dataset)
 
 train_dataloader = dict(
     batch_size=256,
