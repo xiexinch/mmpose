@@ -1,8 +1,7 @@
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
-max_epochs = 420
-stage2_num_epochs = 20
+max_epochs = 100
 base_lr = 4e-3
 
 train_cfg = dict(max_epochs=max_epochs, val_interval=10)
@@ -35,7 +34,7 @@ param_scheduler = [
 ]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=1024)
+auto_scale_lr = dict(base_batch_size=2048)
 
 # codec settings
 train_codec = dict(
@@ -51,7 +50,8 @@ val_codec = dict(
     simcc_split_ratio=2.0,
     sigma=(4.9, 5.66, 4.9),
     normalize=False,
-    rootrel=True)
+    test_mode=True,
+    gt_field='keypoints_3d_gt')
 
 # model settings
 model = dict(
@@ -162,43 +162,6 @@ val_pipeline = [
                    'z_min', 'camera_param'))
 ]
 
-train_pipeline_stage2 = [
-    dict(type='LoadImage', backend_args=backend_args),
-    dict(type='GetBBoxCenterScale'),
-    # dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
-    dict(
-        type='RandomBBoxTransform',
-        shift_factor=0.,
-        scale_factor=[0.75, 1.25],
-        rotate_factor=60),
-    dict(type='TopdownAffine3D', input_size=train_codec['input_size']),
-    dict(type='YOLOXHSVRandomAug'),
-    dict(
-        type='Albumentation',
-        transforms=[
-            dict(type='Blur', p=0.1),
-            dict(type='MedianBlur', p=0.1),
-            dict(
-                type='CoarseDropout',
-                max_holes=1,
-                max_height=0.4,
-                max_width=0.4,
-                min_holes=1,
-                min_height=0.2,
-                min_width=0.2,
-                p=0.5),
-        ]),
-    dict(type='GenerateTarget', encoder=train_codec),
-    dict(
-        type='PackPoseInputs',
-        meta_keys=('id', 'img_id', 'img_path', 'category_id', 'crowd_index',
-                   'ori_shape', 'img_shape', 'input_size', 'input_center',
-                   'input_scale', 'flip', 'flip_direction', 'flip_indices',
-                   'raw_ann_info', 'dataset_name', 'keypoints_3d',
-                   'keypoints_3d_visible'))
-]
-
 # data loaders
 train_dataloader = dict(
     batch_size=256,
@@ -212,11 +175,10 @@ train_dataloader = dict(
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=train_pipeline,
-        # sample_interval=2000
-    ))
+        sample_interval=10))
 val_dataloader = dict(
     batch_size=256,
-    num_workers=2,
+    num_workers=4,
     persistent_workers=True,
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
@@ -226,9 +188,7 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
-        pipeline=val_pipeline,
-        # sample_interval=2000
-    ))
+        pipeline=val_pipeline))
 test_dataloader = val_dataloader
 
 # hooks
@@ -245,11 +205,7 @@ custom_hooks = [
         ema_type='ExpMomentumEMA',
         momentum=0.0002,
         update_buffers=True,
-        priority=49),
-    dict(
-        type='mmdet.PipelineSwitchHook',
-        switch_epoch=max_epochs - stage2_num_epochs,
-        switch_pipeline=train_pipeline_stage2)
+        priority=49)
 ]
 
 # evaluators

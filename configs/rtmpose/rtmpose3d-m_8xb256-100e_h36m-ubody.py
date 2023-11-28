@@ -34,7 +34,7 @@ param_scheduler = [
 ]
 
 # automatically scaling LR based on the actual training batch size
-auto_scale_lr = dict(base_batch_size=1024)
+auto_scale_lr = dict(base_batch_size=2048)
 
 # codec settings
 train_codec = dict(
@@ -50,7 +50,8 @@ val_codec = dict(
     simcc_split_ratio=2.0,
     sigma=(4.9, 5.66, 4.9),
     normalize=False,
-    rootrel=True)
+    test_mode=True,
+    gt_field='keypoints_3d_gt')
 
 # model settings
 model = dict(
@@ -152,6 +153,7 @@ val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine3D', input_size=val_codec['input_size']),
+    dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
         meta_keys=('warp_mat', 'camera_param', 'z_max', 'z_min'))
@@ -164,10 +166,9 @@ scenes = [
 ]
 skip_scenes = ['Speech', 'Movie']
 
-train_datasets, val_datasets = [], []
+train_datasets = []
 for scene in scenes:
     train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
-    val_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     train_dataset = dict(
         type=dataset_type,
         data_root=data_root,
@@ -185,12 +186,9 @@ for scene in scenes:
                 flip_indices=[
                     0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
-        ])
+        ],
+        sample_interval=10)
     train_datasets.append(train_dataset)
-    if scene not in skip_scenes:
-        val_dataset = train_dataset.copy()
-        val_dataset.update({'ann_file': val_ann})
-        val_datasets.append(val_dataset)
 
 h36m_train_dataset = dict(
     type='H36MCOCODataset',
@@ -198,12 +196,10 @@ h36m_train_dataset = dict(
     data_root='data/h36m/',
     data_prefix=dict(img='images/'),
     camera_param_file='annotation_body3d/cameras.pkl',
-    pipeline=[])
-h36m_val_dataset = h36m_train_dataset.copy()
-h36m_val_dataset.update({'ann_file': 'annotation_body2d/h36m_test_fps50.json'})
+    pipeline=[],
+    sample_interval=10)
 
 train_datasets.append(h36m_train_dataset)
-val_datasets.append(h36m_val_dataset)
 
 train_dataloader = dict(
     batch_size=256,
@@ -223,12 +219,30 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type='CombinedDataset',
-        datasets=val_datasets,
-        pipeline=val_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
-        test_mode=True))
+        type='H36MCOCODataset',
+        ann_file='annotation_body2d/h36m_test_fps50.json',
+        data_root='data/h36m/',
+        data_prefix=dict(img='images/'),
+        camera_param_file='annotation_body3d/cameras.pkl',
+        pipeline=val_pipeline))
 test_dataloader = val_dataloader
+
+# hooks
+default_hooks = dict(
+    checkpoint=dict(
+        type='CheckpointHook',
+        save_best='MPJPE',
+        rule='less',
+        max_keep_ckpts=1))
+
+custom_hooks = [
+    dict(
+        type='EMAHook',
+        ema_type='ExpMomentumEMA',
+        momentum=0.0002,
+        update_buffers=True,
+        priority=49)
+]
 
 # evaluators
 val_evaluator = [
@@ -236,13 +250,13 @@ val_evaluator = [
         type='SimpleMPJPE',
         mode='mpjpe',
         pred_field='keypoints',
-        gt_field='keypoints_3d_cam',
-        gt_mask_field='keypoints_visible'),
+        gt_field='keypoints_3d_gt',
+        gt_mask_field='keypoints_3d_visible'),
     dict(
         type='SimpleMPJPE',
         mode='p-mpjpe',
         pred_field='keypoints',
-        gt_field='keypoints_3d_cam',
-        gt_mask_field='keypoints_visible')
+        gt_field='keypoints_3d_gt',
+        gt_mask_field='keypoints_3d_visible')
 ]
 test_evaluator = val_evaluator
