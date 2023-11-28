@@ -224,3 +224,9 @@ val_evaluator = [
         img_field='img_path')
 ]
 test_evaluator = val_evaluator
+
+vis_backends = [
+    dict(type='LocalVisBackend'),
+]
+visualizer = dict(
+    type='Pose3dLocalVisualizer', vis_backends=vis_backends, name='visualizer')

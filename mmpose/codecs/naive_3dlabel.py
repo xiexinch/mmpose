@@ -42,7 +42,8 @@ class Naive3DLabel(BaseKeypointCodec):
                  normalize: bool = True,
                  rootrel: bool = False,
                  test_mode: bool = False,
-                 gt_field: str = 'keypoints_3d') -> None:
+                 gt_field: str = 'keypoints_3d',
+                 camera_param: dict = None) -> None:
         super().__init__()
         self.input_size = input_size
         self.simcc_split_ratio = simcc_split_ratio
@@ -57,6 +58,13 @@ class Naive3DLabel(BaseKeypointCodec):
 
         self.test_mode = test_mode
         self.gt_field = gt_field
+
+        if camera_param is None:
+            self.camera_param = dict(
+                f=(1149.67569987, 1148.79896857),
+                c=(519.81583718, 515.45148698))
+        else:
+            self.camera_param = camera_param
 
     def encode(self,
                keypoints: np.ndarray,
@@ -104,13 +112,19 @@ class Naive3DLabel(BaseKeypointCodec):
 
         keypoints /= self.simcc_split_ratio
 
-        # 1. z 轴坐标从 (0, d) 映射到 (z_min, z_max)
-        z_max = z_max[0] if z_max is not None else self.z_max
-        z_min = z_min[0] if z_min is not None else self.z_min
-        keypoints_z = keypoints[..., 2:] / self.input_size[2] * (z_max -
-                                                                 z_min) + z_min
-        # 2. 不处理 z
-        # keypoints_z = keypoints[..., 2:]
+        # z 轴坐标从 (0, d) 映射到 (z_min, z_max)
+        if z_max is not None and z_min is not None:
+            z_max = z_max[0]
+            z_min = z_min[0]
+            keypoints_z = keypoints[..., 2:] / self.input_size[2] * (
+                z_max - z_min) + z_min
+        else:
+            # test
+            z_max = 8
+            z_min = 2
+            # keypoints_z = keypoints[..., 2:]
+            keypoints_z = keypoints[..., 2:] / self.input_size[2] * (
+                z_max - z_min) + z_min
 
         # 还原 xy 到原图空间
         if warp_mat.ndim == 2:
@@ -243,9 +257,10 @@ def get_simcc_maximum(simcc_x: np.ndarray, simcc_y: np.ndarray,
     locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
     max_val_x = np.amax(simcc_x, axis=1)
     max_val_y = np.amax(simcc_y, axis=1)
-    max_val_z = np.amax(simcc_z, axis=1)
+    # max_val_z = np.amax(simcc_z, axis=1)
 
-    vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
+    # vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
+    vals = np.minimum(max_val_x, max_val_y)
     locs[vals <= 0.] = -1
 
     if N:

@@ -79,7 +79,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                               image: np.ndarray,
                               pose_samples: PoseDataSample,
                               draw_gt: bool = True,
-                              kpt_thr: float = 0.3,
+                              kpt_thr: float = 0.1,
                               num_instances=-1,
                               axis_azimuth: float = 70,
                               axis_limit: float = 1.7,
@@ -199,7 +199,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
 
                 x_3d, y_3d, z_3d = np.split(kpts_valid[:, :3], [1, 2], axis=1)
 
-                kpt_color = kpt_color[valid] / 255.
+                kpt_color = np.array(kpt_color)[valid]
 
                 ax.scatter(x_3d, y_3d, z_3d, marker='o', c=kpt_color)
 
@@ -305,7 +305,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
     def _draw_instances_kpts(self,
                              image: np.ndarray,
                              instances: InstanceData,
-                             kpt_thr: float = 0.3,
+                             kpt_thr: float = 0.01,
                              show_kpt_idx: bool = False,
                              skeleton_style: str = 'mmpose'):
         """Draw keypoints and skeletons (optional) of GT or prediction.
