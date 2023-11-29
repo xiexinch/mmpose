@@ -165,10 +165,11 @@ class RTM3DHead(BaseHead):
         return pred_x, pred_y, pred_z
 
     def decode(self, batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat,
-               batch_z_max, batch_z_min, camera_params):
-        batch_outputs = to_numpy((batch_pred_x, batch_pred_y, batch_pred_z,
-                                  batch_warp_mat, batch_z_max, batch_z_min),
-                                 unzip=True)
+               batch_z_max, batch_z_min, camera_params, target_root):
+        batch_outputs = to_numpy(
+            (batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat,
+             batch_z_max, batch_z_min, target_root),
+            unzip=True)
         preds = []
         for output, camera_param in zip(batch_outputs, camera_params):
             keypoints, scores = self.decoder.decode(*output, camera_param)
@@ -239,10 +240,12 @@ class RTM3DHead(BaseHead):
         batch_z_min = torch.stack([
             torch.from_numpy(b.metainfo['z_min']) for b in batch_data_samples
         ])
+        target_root = torch.stack(
+            [torch.from_numpy(b.target_root) for b in batch_data_samples])
 
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
                             batch_warp_mat, batch_z_max, batch_z_min,
-                            batch_camera_param)
+                            batch_camera_param, target_root)
 
         if test_cfg.get('output_heatmaps', False):
             rank, _ = get_dist_info()

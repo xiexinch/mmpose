@@ -55,7 +55,7 @@ class H36MCOCODataset(BaseCocoStyleDataset):
                                        axis=-1)
         keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
 
-        data_info['keypoints_3d_gt'] = kpt_3d_cam
+        # data_info['keypoints_3d_gt'] = kpt_3d_cam
         data_info['keypoints_3d'] = kpts_3d_pixel
         data_info['keypoints_3d_visible'] = keypoints_3d_visible
         data_info['camera_param'] = self.camera_params[cam_key]
