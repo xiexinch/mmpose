@@ -23,6 +23,15 @@ class H36MCOCODataset(BaseCocoStyleDataset):
 
     def load_data_list(self) -> List[dict]:
         data_list = super().load_data_list()
+        # calculate the stats of keypoints_3d
+        z_max = np.max(
+            [np.max(data['keypoints_3d'][..., 2:]) for data in data_list])
+        z_min = np.min(
+            [np.min(data['keypoints_3d'][..., 2:]) for data in data_list])
+        # set the z_min to data_info
+        for data_info in data_list:
+            data_info['z_min'] = np.array([z_min])
+            data_info['z_max'] = np.array([z_max])
         self.coco = None
         return data_list
 
@@ -33,33 +42,21 @@ class H36MCOCODataset(BaseCocoStyleDataset):
             raise ValueError('keypoints_3d is required in data_info')
         _keypoints_3d = np.array(
             keypoints_3d, dtype=np.float32).reshape(1, -1, 4)
-        keypoints_camera, keypoints_2d, cam_key = self._keypoint_world_to_gt(
-            _keypoints_3d, self.camera_params, data_info['img_path'])
-        keypoints_depth = keypoints_camera[..., 2]
-        keypoints_pixel = np.concatenate(
-            [keypoints_2d, keypoints_depth[..., None]], axis=-1)
+        subj, rest = osp.basename(data_info['img_path']).split('_', 1)
+        _, rest = rest.split('.', 1)
+        camera_name, rest = rest.split('_', 1)
+        cam_key = (subj, camera_name)
+        camera = SimpleCamera(self.camera_params[cam_key])
+        kpts_3d = _keypoints_3d[..., :3]
+        kpt_3d_cam = camera.world_to_camera(kpts_3d)
+        kpts_2d = camera.world_to_pixel(kpts_3d)
+        kpts_3d_depth = kpt_3d_cam[..., 2]
+        kpts_3d_pixel = np.concatenate([kpts_2d, kpts_3d_depth[..., None]],
+                                       axis=-1)
         keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
 
-        data_info['keypoints_3d_gt'] = keypoints_camera
-        data_info['keypoints_3d'] = keypoints_pixel
+        data_info['keypoints_3d_gt'] = kpt_3d_cam
+        data_info['keypoints_3d'] = kpts_3d_pixel
         data_info['keypoints_3d_visible'] = keypoints_3d_visible
         data_info['camera_param'] = self.camera_params[cam_key]
         return data_info
-
-    def _keypoint_world_to_gt(self, keypoints, camera_params, image_name=None):
-        """Project 3D keypoints from the world space to the camera space.
-
-        Args:
-            keypoints (np.ndarray): 3D keypoints in shape [..., 3]
-            camera_params (dict): Parameters for all cameras.
-            image_name (str): The image name to specify the camera.
-        """
-        subj, rest = osp.basename(image_name).split('_', 1)
-        _, rest = rest.split('.', 1)
-        camera, rest = rest.split('_', 1)
-        cam_key = (subj, camera)
-        camera = SimpleCamera(camera_params[cam_key])
-        keypoints_camera = camera.world_to_camera(keypoints[..., :3])
-        keypoints_2d = camera.camera_to_pixel(keypoints_camera)
-
-        return keypoints_camera, keypoints_2d, cam_key
