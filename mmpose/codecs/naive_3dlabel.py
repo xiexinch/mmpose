@@ -70,6 +70,7 @@ class Naive3DLabel(BaseKeypointCodec):
                transformed_keypoints_3d: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
+
         if not self.test_mode:
             x, y, z, weights = self._generate_gaussian(
                 transformed_keypoints_3d, keypoints_visible)  # noqa
