@@ -8,6 +8,7 @@ from mmengine import is_seq_of
 
 from mmpose.registry import TRANSFORMS
 from mmpose.structures.bbox import get_udp_warp_matrix, get_warp_matrix
+from mmpose.utils import SimpleCamera
 
 
 @TRANSFORMS.register_module()
@@ -147,13 +148,18 @@ class TopdownAffine3D(TopdownAffine):
 
     def __init__(self,
                  input_size: Tuple[int, int],
-                 use_udp: bool = False) -> None:
+                 use_udp: bool = False,
+                 camera_param: dict = None) -> None:
         super().__init__((input_size[0], input_size[1]), use_udp)
 
         assert is_seq_of(input_size, int) and len(input_size) == 3, (
             f'Invalid input_size {input_size}')
         self.input_size = input_size
         self.use_udp = use_udp
+        if camera_param is None:
+            self.default_camera = dict(f=(1000, 1000), c=(500, 500))
+        else:
+            self.default_camera = camera_param
 
     def transform(self, results: Dict) -> Optional[dict]:
         """The transform function of :class:`TopdownAffine`.
@@ -204,12 +210,16 @@ class TopdownAffine3D(TopdownAffine):
 
         if results.get('keypoints_3d', None) is not None:
             transformed_keypoints = results['keypoints_3d'].copy()
+            camera_param = results.get('camera_param', self.default_camera)
+            camera = SimpleCamera(camera_param)
+            transformed_keypoints = camera.camera_to_pixel(
+                transformed_keypoints)
+
             # 对3D关键点的(x, y)部分应用仿射变换
             keypoints_xy = transformed_keypoints[..., :2]
-            keypoints_z = transformed_keypoints[..., 2:3]
+            keypoints_z = results['keypoints_3d'][..., 2:3]
             transformed_xy = cv2.transform(keypoints_xy, warp_mat)
-            # 将 z 轴缩放到 (0, d)
-            # 1. 按照每个人缩放
+            # 对3D关键点的z部分进行归一化
             z_max = np.max(results['keypoints_3d'][..., 2:])
             z_min = np.min(results['keypoints_3d'][..., 2:])
             transformed_z = (keypoints_z - z_min) / (z_max - z_min) * d
@@ -217,15 +227,9 @@ class TopdownAffine3D(TopdownAffine):
                 (transformed_xy, transformed_z), axis=-1)
             results['z_max'] = np.array([z_max])
             results['z_min'] = np.array([z_min])
-
-            # 2. 按照数据集缩放
-            # transformed_z = (keypoints_z - results['z_min']) / (results['z_max'] - results['z_min']) * d # noqa: E501
-            # transformed_keypoints = np.concatenate(
-            #     (transformed_xy, transformed_z), axis=-1)
-            # 不处理 z
-            # transformed_keypoints = np.concatenate(
-            #     (transformed_xy, keypoints_z), axis=-1)
             results['transformed_keypoints_3d'] = transformed_keypoints
+        else:
+            results['transformed_keypoints_3d'] = None
 
         results['input_size'] = (w, h, d)
         results['input_center'] = [center[0], center[1], center[0]]

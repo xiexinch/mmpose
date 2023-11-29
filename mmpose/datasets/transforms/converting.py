@@ -288,6 +288,9 @@ class KeypointCombiner(BaseTransform):
         results['keypoints_visible'] = new_keypoints_visible
         if 'keypoints_3d' in results:
             results['keypoints_3d'] = new_keypoints_3d
+        if 'lifting_target' in results:
+            results['lifting_target'] = new_keypoints_3d
+            results['lifting_target_visible'] = new_keypoints_visible
         if self.flip_indices is not None:
             results['flip_indices'] = self.flip_indices
 

@@ -164,11 +164,19 @@ class RTM3DHead(BaseHead):
 
         return pred_x, pred_y, pred_z
 
-    def decode(self, batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat,
-               batch_z_max, batch_z_min, camera_params):
-        batch_outputs = to_numpy((batch_pred_x, batch_pred_y, batch_pred_z,
-                                  batch_warp_mat, batch_z_max, batch_z_min),
-                                 unzip=True)
+    def decode(self,
+               batch_pred_x,
+               batch_pred_y,
+               batch_pred_z,
+               batch_warp_mat,
+               batch_z_max=None,
+               batch_z_min=None,
+               camera_params=None):
+        batch_outputs = to_numpy(
+            (batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat),
+            unzip=True)
+        if batch_z_max is not None and batch_z_min is not None:
+            batch_outputs += (to_numpy(batch_z_max), to_numpy(batch_z_min))
         preds = []
         for output, camera_param in zip(batch_outputs, camera_params):
             keypoints, scores = self.decoder.decode(*output, camera_param)
@@ -226,19 +234,33 @@ class RTM3DHead(BaseHead):
             batch_pred_z = (_batch_pred_z + _batch_pred_z_flip) * 0.5
         else:
             batch_pred_x, batch_pred_y, batch_pred_z = self.forward(feats)
+
         batch_warp_mat = torch.stack([
             torch.from_numpy(b.metainfo['warp_mat'])
             for b in batch_data_samples
         ])
-        batch_camera_param = [
-            b.metainfo['camera_param'] for b in batch_data_samples
-        ]
-        batch_z_max = torch.stack([
-            torch.from_numpy(b.metainfo['z_max']) for b in batch_data_samples
-        ])
-        batch_z_min = torch.stack([
-            torch.from_numpy(b.metainfo['z_min']) for b in batch_data_samples
-        ])
+
+        if batch_data_samples[0].metainfo.get('camera_param',
+                                              None) is not None:
+            batch_camera_param = [
+                b.metainfo['camera_param'] for b in batch_data_samples
+            ]
+        else:
+            batch_camera_param = None
+        if batch_data_samples[0].metainfo.get('z_max', None) is not None:
+            batch_z_max = torch.stack([
+                torch.from_numpy(b.metainfo['z_max'])
+                for b in batch_data_samples
+            ])
+        else:
+            batch_z_max = None
+        if batch_data_samples[0].metainfo.get('z_min', None) is not None:
+            batch_z_min = torch.stack([
+                torch.from_numpy(b.metainfo['z_min'])
+                for b in batch_data_samples
+            ])
+        else:
+            batch_z_min = None
 
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
                             batch_warp_mat, batch_z_max, batch_z_min,

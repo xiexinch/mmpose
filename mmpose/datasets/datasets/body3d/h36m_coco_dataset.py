@@ -49,14 +49,9 @@ class H36MCOCODataset(BaseCocoStyleDataset):
         camera = SimpleCamera(self.camera_params[cam_key])
         kpts_3d = _keypoints_3d[..., :3]
         kpt_3d_cam = camera.world_to_camera(kpts_3d)
-        kpts_2d = camera.world_to_pixel(kpts_3d)
-        kpts_3d_depth = kpt_3d_cam[..., 2]
-        kpts_3d_pixel = np.concatenate([kpts_2d, kpts_3d_depth[..., None]],
-                                       axis=-1)
         keypoints_3d_visible = np.minimum(1, _keypoints_3d[..., 3])
 
-        data_info['keypoints_3d_gt'] = kpt_3d_cam
-        data_info['keypoints_3d'] = kpts_3d_pixel
+        data_info['keypoints_3d'] = kpt_3d_cam
         data_info['keypoints_3d_visible'] = keypoints_3d_visible
         data_info['camera_param'] = self.camera_params[cam_key]
         return data_info

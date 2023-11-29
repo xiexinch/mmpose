@@ -7,6 +7,7 @@ import numpy as np
 from mmengine.fileio import get_local_path
 from xtcocotools.coco import COCO
 
+from mmpose.codecs.utils import pixel_to_camera
 from mmpose.datasets.datasets import BaseMocapDataset
 from mmpose.registry import DATASETS
 
@@ -189,7 +190,7 @@ class UBody3dDataset(BaseMocapDataset):
             kpts_3d = np.zeros((len(anns), num_keypoints, 3), dtype=np.float32)
             keypoints_visible = np.zeros((len(anns), num_keypoints, 1),
                                          dtype=np.float32)
-            scales = np.zeros(len(anns), dtype=np.float32)
+            scales = np.zeros((len(anns), 2), dtype=np.float32)
             centers = np.zeros((len(anns), 2), dtype=np.float32)
 
             for j, ann in enumerate(anns):
@@ -199,9 +200,9 @@ class UBody3dDataset(BaseMocapDataset):
                 keypoints_visible[j] = np.array(
                     ann['keypoints_valid'], dtype=np.float32)
                 if 'scale' in ann:
-                    scales[j] = ann['scale']
+                    scales[j] = np.array(ann['scale'])
                 if 'center' in ann:
-                    centers[j] = ann['center']
+                    centers[j] = np.array(ann['center'])
 
             imgs = self.ann_data.loadImgs(img_ids)
             keypoints_visible = keypoints_visible.squeeze(-1)
@@ -218,10 +219,14 @@ class UBody3dDataset(BaseMocapDataset):
                 cam_param['w'] = 1000
                 cam_param['h'] = 1000
 
+            fx, fy = cam_param['focal']
+            cx, cy = cam_param['princpt']
+            keypoints_3d_cam = pixel_to_camera(kpts_3d, fx, fy, cx, cy)
+
             instance_info = {
                 'num_keypoints': num_keypoints,
                 'keypoints': kpts,
-                'keypoints_3d': kpts_3d,
+                'keypoints_3d': keypoints_3d_cam,
                 'keypoints_visible': keypoints_visible,
                 'scale': scales,
                 'center': centers,
@@ -230,9 +235,9 @@ class UBody3dDataset(BaseMocapDataset):
                 'iscrowd': 0,
                 'img_paths': list(img_paths),
                 'img_ids': [img['id'] for img in imgs],
-                'lifting_target': kpts_3d[target_idx],
+                'lifting_target': keypoints_3d_cam[target_idx],
                 'lifting_target_visible': keypoints_visible[target_idx],
-                'target_img_paths': img_paths[target_idx],
+                'target_img_paths': list(img_paths[target_idx]),
                 'camera_param': cam_param,
                 'factor': factors,
                 'target_idx': target_idx,
@@ -251,3 +256,8 @@ class UBody3dDataset(BaseMocapDataset):
             image_list.append(img)
 
         return instance_list, image_list
+
+    def load_data_list(self) -> List[dict]:
+        data_list = super().load_data_list()
+        self.ann_data = None
+        return data_list

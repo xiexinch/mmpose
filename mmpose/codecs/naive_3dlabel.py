@@ -41,6 +41,7 @@ class Naive3DLabel(BaseKeypointCodec):
                  label_smooth_weight: float = 0.0,
                  normalize: bool = True,
                  rootrel: bool = False,
+                 camera_param: dict = None,
                  test_mode: bool = False,
                  gt_field: str = 'keypoints_3d') -> None:
         super().__init__()
@@ -55,13 +56,17 @@ class Naive3DLabel(BaseKeypointCodec):
         else:
             self.sigma = np.array(sigma, dtype=np.float32)
 
+        if camera_param is not None:
+            self.camera_param = camera_param
+        else:
+            self.camera_param = dict(f=(1000, 1000), c=(500, 500))
+
         self.test_mode = test_mode
         self.gt_field = gt_field
 
     def encode(self,
                keypoints: np.ndarray,
                keypoints_3d: np.ndarray,
-               camera_param: dict,
                transformed_keypoints_3d: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
@@ -72,24 +77,21 @@ class Naive3DLabel(BaseKeypointCodec):
                 keypoint_x_labels=x,
                 keypoint_y_labels=y,
                 keypoint_z_labels=z,
-                keypoint_weights=weights,
-                transformed_keypoints_3d=transformed_keypoints_3d,
-                keypoints_3d_visible=keypoints_visible,
-            )
+                keypoint_weights=weights)
         else:
-            fx, fy = camera_param['f']
-            cx, cy = camera_param['c']
-            keypoints_3d_camera = pixel_to_camera(keypoints_3d, fx, fy, cx, cy)
             encoded = dict(
-                keypoints_3d_gt=keypoints_3d_camera,
-                keypoints_3d_visible=keypoints_visible,
-                instance_mapping_table=self.instance_mapping_table)
+                keypoints_3d_gt=keypoints_3d,
+                keypoints_3d_visible=keypoints_visible)
         return encoded
 
-    def decode(self, simcc_x: np.ndarray, simcc_y: np.ndarray,
-               simcc_z: np.ndarray, warp_mat: np.ndarray, z_max: np.ndarray,
-               z_min: np.ndarray,
-               camera_param: dict) -> Tuple[np.ndarray, np.ndarray]:
+    def decode(self,
+               simcc_x: np.ndarray,
+               simcc_y: np.ndarray,
+               simcc_z: np.ndarray,
+               warp_mat: np.ndarray,
+               z_max: np.ndarray = None,
+               z_min: np.ndarray = None,
+               camera_param: dict = None) -> Tuple[np.ndarray, np.ndarray]:
         """Decode keypoints from 3D labels."""
         keypoints, scores = get_simcc_maximum(simcc_x, simcc_y, simcc_z)
 
@@ -99,15 +101,13 @@ class Naive3DLabel(BaseKeypointCodec):
 
         keypoints /= self.simcc_split_ratio
 
-        # 1. z 轴坐标从 (0, d) 映射到 (z_min, z_max)
-        z_max = z_max[0]
-        z_min = z_min[0]
-        # print(z_max, z_min, self.input_size[2])
+        # z 轴坐标从 (0, d) 映射到 (z_min, z_max)
+        if z_max is not None and z_min is not None:
+            z_max, z_min = z_max[0], z_min[0]
+        else:
+            z_max, z_min = 1.0, 0.0
         keypoints_z = keypoints[..., 2:] / self.input_size[2] * (z_max -
                                                                  z_min) + z_min
-        # 2. 不处理 z
-        # keypoints_z = keypoints[..., 2:]
-
         # 还原 xy 到原图空间
         keypoints_xy = keypoints[..., :2]
         warp_mat_homogeneous = np.vstack([warp_mat[0], [0, 0, 1]])
@@ -117,7 +117,8 @@ class Naive3DLabel(BaseKeypointCodec):
         keypoints = np.concatenate((keypoints_xy, keypoints_z), axis=-1)
 
         # 转换图像空间
-        # camera = SimpleCamera(camera_param)
+        if camera_param is None:
+            camera_param = self.camera_param
         fx, fy = camera_param['f']
         cx, cy = camera_param['c']
         keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
