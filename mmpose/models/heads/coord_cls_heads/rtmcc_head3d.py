@@ -241,7 +241,7 @@ class RTM3DHead(BaseHead):
             torch.from_numpy(b.metainfo['z_min']) for b in batch_data_samples
         ])
         target_root = torch.stack(
-            [torch.from_numpy(b.target_root) for b in batch_data_samples])
+            [torch.from_numpy(b.root) for b in batch_data_samples])
 
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
                             batch_warp_mat, batch_z_max, batch_z_min,
