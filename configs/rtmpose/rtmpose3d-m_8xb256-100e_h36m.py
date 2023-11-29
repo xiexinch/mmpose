@@ -152,7 +152,7 @@ val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
     dict(type='TopdownAffine3D', input_size=val_codec['input_size']),
-    # dict(type='GenerateTarget', encoder=val_codec),
+    dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
         meta_keys=('id', 'img_id', 'img_path', 'category_id', 'crowd_index',
