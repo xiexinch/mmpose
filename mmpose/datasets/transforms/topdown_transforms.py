@@ -227,9 +227,11 @@ class TopdownAffine3D(TopdownAffine):
                 (transformed_xy, transformed_z), axis=-1)
             results['z_max'] = np.array([z_max])
             results['z_min'] = np.array([z_min])
-            results['transformed_keypoints_3d'] = transformed_keypoints
+            results['transformed_keypoints'] = transformed_keypoints
         else:
-            results['transformed_keypoints_3d'] = None
+            results['transformed_keypoints'] = np.zeros((1, 17, 3))
+            results['keypoints_visible'] = np.ones((1, 17, 1))
+            results['camera_param'] = None
 
         results['input_size'] = (w, h, d)
         results['input_center'] = [center[0], center[1], center[0]]

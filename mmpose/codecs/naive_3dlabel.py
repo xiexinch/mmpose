@@ -6,17 +6,16 @@ import cv2
 import numpy as np
 
 from mmpose.registry import KEYPOINT_CODECS
-# from mmpose.utils import SimpleCamera
+from mmpose.utils import SimpleCamera
 from .base import BaseKeypointCodec
-from .utils import pixel_to_camera
+
+# from .utils import pixel_to_camera
 
 
 @KEYPOINT_CODECS.register_module()
 class Naive3DLabel(BaseKeypointCodec):
 
-    auxiliary_encode_keys = {
-        'transformed_keypoints_3d', 'camera_param', 'keypoints_3d'
-    }
+    auxiliary_encode_keys = {'transformed_keypoints', 'keypoints_3d'}
 
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
@@ -59,7 +58,30 @@ class Naive3DLabel(BaseKeypointCodec):
         if camera_param is not None:
             self.camera_param = camera_param
         else:
-            self.camera_param = dict(f=(1000, 1000), c=(500, 500))
+            self.camera_param = {
+                'R':
+                np.array([[-0.91536173, 0.05154812, -0.39931903],
+                          [0.40180837, 0.18037357, -0.89778361],
+                          [0.02574754, -0.98224649, -0.18581953]]),
+                'T':
+                np.array([[1.84110703], [4.95528462], [1.5634454]]),
+                'c':
+                np.array([[512.54150496], [515.45148698]]),
+                'f':
+                np.array([[1145.04940459], [1143.78109572]]),
+                'k':
+                np.array([[-0.20709891], [0.24777518], [-0.00307515]]),
+                'p':
+                np.array([[-0.00142447], [-0.0009757]]),
+                'w':
+                1000,
+                'h':
+                1002,
+                'name':
+                'camera1',
+                'id':
+                '54138969'
+            }
 
         self.test_mode = test_mode
         self.gt_field = gt_field
@@ -67,13 +89,13 @@ class Naive3DLabel(BaseKeypointCodec):
     def encode(self,
                keypoints: np.ndarray,
                keypoints_3d: np.ndarray,
-               transformed_keypoints_3d: np.ndarray,
+               transformed_keypoints: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
 
         if not self.test_mode:
             x, y, z, weights = self._generate_gaussian(
-                transformed_keypoints_3d, keypoints_visible)  # noqa
+                transformed_keypoints, keypoints_visible)  # noqa
             encoded = dict(
                 keypoint_x_labels=x,
                 keypoint_y_labels=y,
@@ -106,7 +128,7 @@ class Naive3DLabel(BaseKeypointCodec):
         if z_max is not None and z_min is not None:
             z_max, z_min = z_max[0], z_min[0]
         else:
-            z_max, z_min = 1.0, 0.0
+            z_max, z_min = 8.001891, 2.0556197
         keypoints_z = keypoints[..., 2:] / self.input_size[2] * (z_max -
                                                                  z_min) + z_min
         # 还原 xy 到原图空间
@@ -120,9 +142,8 @@ class Naive3DLabel(BaseKeypointCodec):
         # 转换图像空间
         if camera_param is None:
             camera_param = self.camera_param
-        fx, fy = camera_param['f']
-        cx, cy = camera_param['c']
-        keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
+        camera = SimpleCamera(camera_param)
+        keypoints_xy = camera.pixel_to_camera(keypoints_xy)
         return keypoints, scores
 
     def _map_coordinates(self,

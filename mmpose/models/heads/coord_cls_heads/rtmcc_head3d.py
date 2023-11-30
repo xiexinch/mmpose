@@ -246,7 +246,7 @@ class RTM3DHead(BaseHead):
                 b.metainfo['camera_param'] for b in batch_data_samples
             ]
         else:
-            batch_camera_param = None
+            batch_camera_param = [None for _ in batch_data_samples]
         if batch_data_samples[0].metainfo.get('z_max', None) is not None:
             batch_z_max = torch.stack([
                 torch.from_numpy(b.metainfo['z_max'])
