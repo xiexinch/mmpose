@@ -6,11 +6,83 @@ import os.path as osp
 from functools import partial
 from typing import Dict, List
 
+import cv2
 import mmengine
 import numpy as np
 import smplx
 import torch
 from pycocotools.coco import COCO
+
+COCO_JOINTS = [
+    'Nose',
+    'L_Eye',
+    'R_Eye',
+    'L_Ear',
+    'R_Ear',
+    'L_Shoulder',
+    'R_Shoulder',
+    'L_Elbow',
+    'R_Elbow',
+    'L_Wrist',
+    'R_Wrist',
+    'L_Hip',
+    'R_Hip',
+    'L_Knee',
+    'R_Knee',
+    'L_Ankle',
+    'R_Ankle',
+    'Pelvis',
+    'L_Big_toe',
+    'L_Small_toe',
+    'L_Heel',
+    'R_Big_toe',
+    'R_Small_toe',
+    'R_Heel',  # body part
+    'L_Wrist_Hand',
+    'L_Thumb_1',
+    'L_Thumb_2',
+    'L_Thumb_3',
+    'L_Thumb_4',
+    'L_Index_1',
+    'L_Index_2',
+    'L_Index_3',
+    'L_Index_4',
+    'L_Middle_1',
+    'L_Middle_2',
+    'L_Middle_3',
+    'L_Middle_4',
+    'L_Ring_1',
+    'L_Ring_2',
+    'L_Ring_3',
+    'L_Ring_4',
+    'L_Pinky_1',
+    'L_Pinky_2',
+    'L_Pinky_3',
+    'L_Pinky_4',  # left hand
+    'R_Wrist_Hand',
+    'R_Thumb_1',
+    'R_Thumb_2',
+    'R_Thumb_3',
+    'R_Thumb_4',
+    'R_Index_1',
+    'R_Index_2',
+    'R_Index_3',
+    'R_Index_4',
+    'R_Middle_1',
+    'R_Middle_2',
+    'R_Middle_3',
+    'R_Middle_4',
+    'R_Ring_1',
+    'R_Ring_2',
+    'R_Ring_3',
+    'R_Ring_4',
+    'R_Pinky_1',
+    'R_Pinky_2',
+    'R_Pinky_3',
+    'R_Pinky_4',  # right hand
+    *['Face_' + str(i) for i in range(56, 73)],  # face contour
+    *['Face_' + str(i) for i in range(5, 56)]  # face
+]
 
 
 class SMPLX(object):
@@ -213,6 +285,16 @@ def cam2pixel(cam_coord, f, c):
     return np.stack((x, y, z), 1)
 
 
+def convert_smplx_to_coco(joints, target_names, src_names):
+    new_joints = np.zeros((len(target_names), 3), dtype=np.float32)
+    for i, name in enumerate(src_names):
+        if name not in target_names:
+            continue
+        idx = target_names.index(name)
+        new_joints[idx, :] = joints[i, :]
+    return new_joints
+
+
 def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
                        human_model_path: str):
     annos = read_annotation_file(
@@ -244,70 +326,87 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
         if not os.path.exists(img_path):
             progress_bar.update()
             continue
-        if str(aid) not in annos:
+        if ann['valid_label'] == 0 or str(aid) not in annos:
             progress_bar.update()
             continue
 
         smplx_param = annos[str(aid)]
-        human_model_param = smplx_param['smplx_param']
+        human_param = smplx_param['smplx_param']
         cam_param = smplx_param['cam_param']
-        if 'lhand_valid' not in human_model_param:
-            human_model_param['lhand_valid'] = ann['lefthand_valid']
-            human_model_param['rhand_valid'] = ann['righthand_valid']
-            human_model_param['face_valid'] = ann['face_valid']
+        if 'lhand_valid' not in human_param:
+            human_param['lhand_valid'] = ann['lefthand_valid']
+            human_param['rhand_valid'] = ann['righthand_valid']
+            human_param['face_valid'] = ann['face_valid']
 
         rotation_valid = np.ones((human_model.orig_joint_num),
                                  dtype=np.float32)
         coord_valid = np.ones((human_model.joint_num), dtype=np.float32)
 
-        root_pose = human_model_param['root_pose']
-        body_pose = human_model_param['body_pose']
-        shape = human_model_param['shape']
-        trans = human_model_param['trans']
+        root_pose = human_param['root_pose']
+        body_pose = human_param['body_pose']
+        shape = human_param['shape']
+        trans = human_param['trans']
 
-        if 'lhand_pose' in human_model_param and human_model_param.get(
-                'lhand_valid', False):
-            lhand_pose = human_model_param['lhand_pose']
+        if 'lhand_pose' in human_param and human_param['lhand_valid']:
+            lhand_pose = human_param['lhand_pose']
         else:
             lhand_pose = np.zeros(
                 (3 * len(human_model.orig_joint_part['lhand'])),
                 dtype=np.float32)
             rotation_valid[human_model.orig_joint_part['lhand']] = 0
-            coord_valid[human_model.orig_joint_part['lhand']] = 0
+            coord_valid[human_model.joint_part['lhand']] = 0
 
-        if 'rhand_pose' in human_model_param and human_model_param.get(
-                'rhand_valid', False):
-            rhand_pose = human_model_param['rhand_pose']
+        if 'rhand_pose' in human_param and human_param['rhand_valid']:
+            rhand_pose = human_param['rhand_pose']
         else:
             rhand_pose = np.zeros(
                 (3 * len(human_model.orig_joint_part['rhand'])),
                 dtype=np.float32)
             rotation_valid[human_model.orig_joint_part['rhand']] = 0
-            coord_valid[human_model.orig_joint_part['rhand']] = 0
+            coord_valid[human_model.joint_part['rhand']] = 0
 
-        if 'jaw_pose' in human_model_param and \
-            'expr' in human_model_param and \
-                human_model_param.get('face_valid', False):
-            jaw_pose = human_model_param['jaw_pose']
-            expr = human_model_param['expr']
+        if 'jaw_pose' in human_param and 'expr' in human_param and human_param[
+                'face_valid']:
+            jaw_pose = human_param['jaw_pose']
+            expr = human_param['expr']
         else:
             jaw_pose = np.zeros((3), dtype=np.float32)
             expr = np.zeros((human_model.expr_code_dim), dtype=np.float32)
             rotation_valid[human_model.orig_joint_part['face']] = 0
-            coord_valid[human_model.orig_joint_part['face']] = 0
+            coord_valid[human_model.joint_part['face']] = 0
 
         # init human model inputs
         device = torch.device(
             'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
-        root_pose = torch.FloatTensor(root_pose).to(device).view(1, 3)
-        body_pose = torch.FloatTensor(body_pose).to(device).view(-1, 3)
-        lhand_pose = torch.FloatTensor(lhand_pose).to(device).view(-1, 3)
-        rhand_pose = torch.FloatTensor(rhand_pose).to(device).view(-1, 3)
-        jaw_pose = torch.FloatTensor(jaw_pose).to(device).view(-1, 3)
-        shape = torch.FloatTensor(shape).to(device).view(1, -1)
-        expr = torch.FloatTensor(expr).to(device).view(1, -1)
-        trans = torch.FloatTensor(trans).to(device).view(1, -1)
+        root_pose = torch.from_numpy(np.array(root_pose,
+                                              dtype=np.float32)).view(-1, 3)
+        body_pose = torch.from_numpy(np.array(
+            body_pose, dtype=np.float32)).to(device).view(-1, 3)
+        lhand_pose = torch.from_numpy(np.array(
+            lhand_pose, dtype=np.float32)).to(device).view(-1, 3)
+        rhand_pose = torch.from_numpy(np.array(
+            rhand_pose, dtype=np.float32)).to(device).view(-1, 3)
+        jaw_pose = torch.from_numpy(np.array(
+            jaw_pose, dtype=np.float32)).to(device).view(-1, 3)
+        shape = torch.from_numpy(np.array(shape,
+                                          dtype=np.float32)).to(device).view(
+                                              1, -1)
+        expr = torch.from_numpy(np.array(expr,
+                                         dtype=np.float32)).to(device).view(
+                                             1, -1)
+        trans = torch.from_numpy(np.array(trans,
+                                          dtype=np.float32)).to(device).view(
+                                              1, -1)
         zero_pose = torch.zeros((1, 3), dtype=torch.float32, device=device)
+
+        if 'R' in cam_param:
+            R = torch.from_numpy(np.array(cam_param['R'],
+                                          dtype=np.float32)).view(3, 3)
+            root_pose = root_pose.numpy()
+            root_pose, _ = cv2.Rodrigues(root_pose)
+            root_pose, _ = cv2.Rodrigues(np.dot(R, root_pose))
+            root_pose = torch.from_numpy(root_pose).view(1, 3)
+        root_pose = root_pose.to(device)
 
         with torch.no_grad():
             output = human_model.neutral_model(
@@ -326,37 +425,20 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
         joint_img = cam2pixel(joint_cam, cam_param['focal'],
                               cam_param['princpt'])
 
-        joint_cam = (joint_cam - joint_cam[human_model.root_joint_idx, None, :]
-                     )  # root-relative
-        joint_cam[human_model.joint_part['lhand'], :] = (
-            joint_cam[human_model.joint_part['lhand'], :] -
-            joint_cam[human_model.lwrist_idx, None, :]
-        )  # left hand root-relative
-        joint_cam[human_model.joint_part['rhand'], :] = (
-            joint_cam[human_model.joint_part['rhand'], :] -
-            joint_cam[human_model.rwrist_idx, None, :]
-        )  # right hand root-relative
-        joint_cam[human_model.joint_part['face'], :] = (
-            joint_cam[human_model.joint_part['face'], :] -
-            joint_cam[human_model.neck_idx, None, :])  # face root-relative
+        joint_img = convert_smplx_to_coco(joint_img, COCO_JOINTS,
+                                          human_model.joints_name)
+        joint_cam = convert_smplx_to_coco(joint_cam, COCO_JOINTS,
+                                          human_model.joints_name)
 
-        body_3d_size = 2
-        output_hm_shape = (16, 16, 12)
-        joint_img[human_model.joint_part['body'],
-                  2] = ((joint_cam[human_model.joint_part['body'], 2].copy() /
-                         (body_3d_size / 2) + 1) / 2.0 * output_hm_shape[0])
-        joint_img[human_model.joint_part['lhand'],
-                  2] = ((joint_cam[human_model.joint_part['lhand'], 2].copy() /
-                         (body_3d_size / 2) + 1) / 2.0 * output_hm_shape[0])
-        joint_img[human_model.joint_part['rhand'],
-                  2] = ((joint_cam[human_model.joint_part['rhand'], 2].copy() /
-                         (body_3d_size / 2) + 1) / 2.0 * output_hm_shape[0])
-        joint_img[human_model.joint_part['face'],
-                  2] = ((joint_cam[human_model.joint_part['face'], 2].copy() /
-                         (body_3d_size / 2) + 1) / 2.0 * output_hm_shape[0])
+        # remove pelvis
+        pelvis_idx = COCO_JOINTS.index('Pelvis')
+        joint_img = np.concatenate(
+            [joint_img[:pelvis_idx], joint_img[pelvis_idx + 1:]])
+        joint_cam = np.concatenate(
+            [joint_cam[:pelvis_idx], joint_cam[pelvis_idx + 1:]])
 
         keypoints_2d = joint_img[:, :2].copy()
-        keypoints_3d = joint_img.copy()
+        keypoints_3d = joint_cam.copy()
         keypoints_valid = coord_valid.reshape((-1, 1))
 
         ann['keypoints'] = keypoints_2d.tolist()
