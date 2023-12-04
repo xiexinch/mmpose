@@ -8,6 +8,7 @@ import numpy as np
 from mmpose.registry import KEYPOINT_CODECS
 from mmpose.utils import SimpleCamera
 from .base import BaseKeypointCodec
+from .utils import pixel_to_camera
 
 
 @KEYPOINT_CODECS.register_module()
@@ -133,14 +134,18 @@ class Naive3DLabel(BaseKeypointCodec):
         warp_mat_homogeneous = np.vstack([warp_mat[0], [0, 0, 1]])
         warp_inv = warp_inv = np.linalg.inv(warp_mat_homogeneous)
         keypoints_xy = cv2.transform(keypoints_xy, warp_inv)[..., :2]
-        # 拼接 xyz
         keypoints = np.concatenate((keypoints_xy, keypoints_z), axis=-1)
 
         # 转换图像空间
         if camera_param is None:
             camera_param = self.camera_param
-        camera = SimpleCamera(camera_param)
-        keypoints = camera.pixel_to_camera(keypoints)
+        if 'R' in camera_param:
+            camera = SimpleCamera(camera_param)
+            keypoints = camera.pixel_to_camera(keypoints)
+        else:
+            fx, fy = camera_param['f']
+            cx, cy = camera_param['c']
+            keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
         return keypoints, scores
 
     def _map_coordinates(self,
