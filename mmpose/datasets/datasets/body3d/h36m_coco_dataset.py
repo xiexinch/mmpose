@@ -23,15 +23,6 @@ class H36MCOCODataset(BaseCocoStyleDataset):
 
     def load_data_list(self) -> List[dict]:
         data_list = super().load_data_list()
-        # calculate the stats of keypoints_3d
-        z_max = np.max(
-            [np.max(data['keypoints_3d'][..., 2:]) for data in data_list])
-        z_min = np.min(
-            [np.min(data['keypoints_3d'][..., 2:]) for data in data_list])
-        # set the z_min to data_info
-        for data_info in data_list:
-            data_info['z_min'] = np.array([z_min])
-            data_info['z_max'] = np.array([z_max])
         self.coco = None
         return data_list
 
