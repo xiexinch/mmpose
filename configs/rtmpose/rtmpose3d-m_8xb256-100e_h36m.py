@@ -155,7 +155,8 @@ val_pipeline = [
     dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('warp_mat', 'z_max', 'z_min', 'camera_param', 'root'))
+        meta_keys=('img_path', 'warp_mat', 'z_max', 'z_min', 'camera_param',
+                   'root'))
 ]
 
 # data loaders

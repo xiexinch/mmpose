@@ -156,7 +156,8 @@ val_pipeline = [
     dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('warp_mat', 'camera_param', 'z_max', 'z_min'))
+        meta_keys=('img_path', 'warp_mat', 'z_max', 'z_min', 'camera_param',
+                   'root'))
 ]
 
 scenes = [

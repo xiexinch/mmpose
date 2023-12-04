@@ -175,11 +175,17 @@ class RTM3DHead(BaseHead):
         batch_outputs = to_numpy(
             (batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat),
             unzip=True)
-        if batch_z_max is not None and batch_z_min is not None:
-            batch_outputs += (to_numpy(batch_z_max), to_numpy(batch_z_min))
+        if batch_z_max is not None:
+            batch_z_max = to_numpy(batch_z_max, unzip=True)
+        if batch_z_min is not None:
+            batch_z_min = to_numpy(batch_z_min, unzip=True)
+
         preds = []
-        for output, camera_param in zip(batch_outputs, camera_params):
-            keypoints, scores = self.decoder.decode(*output, camera_param)
+        for output, z_max, z_min, camera_param in zip(batch_outputs,
+                                                      batch_z_max, batch_z_min,
+                                                      camera_params):
+            keypoints, scores = self.decoder.decode(
+                *output, z_max=z_max, z_min=z_min, camera_param=camera_param)
             preds.append(
                 InstanceData(keypoints=keypoints, keypoint_scores=scores))
         return preds

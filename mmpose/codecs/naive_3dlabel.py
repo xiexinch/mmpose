@@ -8,15 +8,12 @@ import numpy as np
 from mmpose.registry import KEYPOINT_CODECS
 from mmpose.utils import SimpleCamera
 from .base import BaseKeypointCodec
-from .utils import camera_to_pixel
 
 
 @KEYPOINT_CODECS.register_module()
 class Naive3DLabel(BaseKeypointCodec):
 
-    auxiliary_encode_keys = {
-        'transformed_keypoints', 'camera_param', 'keypoints_3d'
-    }
+    auxiliary_encode_keys = {'transformed_keypoints', 'keypoints_3d'}
 
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
@@ -91,17 +88,11 @@ class Naive3DLabel(BaseKeypointCodec):
                keypoints: np.ndarray,
                keypoints_3d: np.ndarray,
                transformed_keypoints: np.ndarray,
-               camera_param: dict,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
-
         if not self.test_mode:
-            kpts_3d = transformed_keypoints.copy()
-            fx, fy = camera_param['f']
-            cx, cy = camera_param['c']
-            kpts_3d_image = camera_to_pixel(kpts_3d, fx, fy, cx, cy)
             x, y, z, weights = self._generate_gaussian(
-                kpts_3d_image, keypoints_visible)  # noqa
+                transformed_keypoints, keypoints_visible)  # noqa
             encoded = dict(
                 keypoint_x_labels=x,
                 keypoint_y_labels=y,

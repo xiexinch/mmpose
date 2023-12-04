@@ -6,8 +6,10 @@ import numpy as np
 from mmcv.transforms import BaseTransform
 from mmengine import is_seq_of
 
+from mmpose.codecs.utils import camera_to_pixel
 from mmpose.registry import TRANSFORMS
 from mmpose.structures.bbox import get_udp_warp_matrix, get_warp_matrix
+from mmpose.utils import SimpleCamera
 
 
 @TRANSFORMS.register_module()
@@ -210,8 +212,19 @@ class TopdownAffine3D(TopdownAffine):
         if results.get('keypoints_3d', None) is not None:
             transformed_keypoints = results['keypoints_3d'].copy()
 
+            camera_param = results['camera_param']
+            if 'R' in camera_param:
+                camera = SimpleCamera(camera_param)
+                transformed_keypoints = camera.camera_to_pixel(
+                    transformed_keypoints)
+                keypoints_xy = transformed_keypoints[..., :2]
+            else:
+                fx, fy = camera_param['f']
+                cx, cy = camera_param['c']
+                keypoints_xy = camera_to_pixel(transformed_keypoints, fx, fy,
+                                               cx, cy)
+
             # 对3D关键点的(x, y)部分应用仿射变换
-            keypoints_xy = transformed_keypoints[..., :2]
             keypoints_z = results['keypoints_3d'][..., 2:3]
             transformed_xy = cv2.transform(keypoints_xy, warp_mat)
             # 对3D关键点的z部分进行归一化

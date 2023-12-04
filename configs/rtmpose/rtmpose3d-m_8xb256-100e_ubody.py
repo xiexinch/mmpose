@@ -1,7 +1,7 @@
 _base_ = ['../_base_/default_runtime.py']
 
 # runtime
-max_epochs = 50
+max_epochs = 100
 base_lr = 4e-3
 
 train_cfg = dict(max_epochs=max_epochs, val_interval=10)
@@ -156,7 +156,8 @@ val_pipeline = [
     dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('warp_mat', 'camera_param', 'z_max', 'z_min'))
+        meta_keys=('img_path', 'warp_mat', 'z_max', 'z_min', 'camera_param',
+                   'root'))
 ]
 
 scenes = [
@@ -169,7 +170,6 @@ skip_scenes = ['Speech', 'Movie']
 train_datasets = []
 for scene in scenes:
     train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
-    val_ann = f'annotations/{scene}/val_3dkeypoint_annotation.json'
     train_dataset = dict(
         type=dataset_type,
         data_root=data_root,
@@ -190,6 +190,17 @@ for scene in scenes:
         ],
         sample_interval=10)
     train_datasets.append(train_dataset)
+
+h36m_train_dataset = dict(
+    type='H36MCOCODataset',
+    ann_file='annotation_body2d/h36m_coco_train_fps50.json',
+    data_root='data/h36m/',
+    data_prefix=dict(img='images/'),
+    camera_param_file='annotation_body3d/cameras.pkl',
+    pipeline=[],
+    sample_interval=10)
+
+train_datasets.append(h36m_train_dataset)
 
 train_dataloader = dict(
     batch_size=256,
