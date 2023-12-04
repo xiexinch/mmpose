@@ -191,17 +191,6 @@ for scene in scenes:
         sample_interval=10)
     train_datasets.append(train_dataset)
 
-h36m_train_dataset = dict(
-    type='H36MCOCODataset',
-    ann_file='annotation_body2d/h36m_coco_train_fps50.json',
-    data_root='data/h36m/',
-    data_prefix=dict(img='images/'),
-    camera_param_file='annotation_body3d/cameras.pkl',
-    pipeline=[],
-    sample_interval=10)
-
-train_datasets.append(h36m_train_dataset)
-
 train_dataloader = dict(
     batch_size=256,
     num_workers=10,
