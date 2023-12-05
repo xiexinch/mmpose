@@ -199,7 +199,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
 
                 x_3d, y_3d, z_3d = np.split(kpts_valid[:, :3], [1, 2], axis=1)
 
-                kpt_color = np.array(kpt_color)[valid]
+                kpt_color = kpt_color[valid] / 255.
 
                 ax.scatter(x_3d, y_3d, z_3d, marker='o', c=kpt_color)
 
@@ -603,7 +603,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             show_kpt_idx=show_kpt_idx,
             axis_dist=axis_dist,
             axis_elev=axis_elev,
-            scores_2d=scores_2d)
+            scores_2d=scores_2d,
+            kpt_thr=kpt_thr)
 
         # merge visualization results
         if det_img_data is not None:

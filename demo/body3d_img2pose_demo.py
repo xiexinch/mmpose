@@ -290,6 +290,7 @@ def main():
     pose_estimator.cfg.visualizer.det_dataset_link_color = det_dataset_link_color  # noqa: E501
     pose_estimator.cfg.visualizer.skeleton = det_dataset_skeleton
     pose_estimator.cfg.visualizer.link_color = det_dataset_link_color
+    pose_estimator.cfg.visualizer.kpt_color = det_kpt_color
     visualizer = VISUALIZERS.build(pose_estimator.cfg.visualizer)
 
     if args.input == 'webcam':
