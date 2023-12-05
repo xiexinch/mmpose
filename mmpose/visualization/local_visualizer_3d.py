@@ -199,7 +199,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
 
                 x_3d, y_3d, z_3d = np.split(kpts_valid[:, :3], [1, 2], axis=1)
 
-                kpt_color = kpt_color[valid] / 255.
+                kpt_color = np.array(kpt_color)[valid]
 
                 ax.scatter(x_3d, y_3d, z_3d, marker='o', c=kpt_color)
 

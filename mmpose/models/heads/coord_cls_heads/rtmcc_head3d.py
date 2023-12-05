@@ -177,8 +177,12 @@ class RTM3DHead(BaseHead):
             unzip=True)
         if batch_z_max is not None:
             batch_z_max = to_numpy(batch_z_max, unzip=True)
+        else:
+            batch_z_max = [None for _ in batch_outputs]
         if batch_z_min is not None:
             batch_z_min = to_numpy(batch_z_min, unzip=True)
+        else:
+            batch_z_min = [None for _ in batch_outputs]
 
         preds = []
         for output, z_max, z_min, camera_param in zip(batch_outputs,

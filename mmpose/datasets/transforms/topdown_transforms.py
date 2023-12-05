@@ -239,6 +239,7 @@ class TopdownAffine3D(TopdownAffine):
         else:
             results['transformed_keypoints'] = np.zeros((1, 17, 3))
             results['keypoints_visible'] = np.ones((1, 17, 1))
+            results['keypoints_3d'] = np.zeros((1, 17, 3))
             results['camera_param'] = None
 
         results['input_size'] = (w, h, d)
