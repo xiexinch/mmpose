@@ -89,7 +89,7 @@ class MPJPE(BaseMetric):
             mask = gt[self.gt_mask_field].astype(bool).reshape(
                 gt_coords.shape[0], -1)
             # instance action
-            if isinstance(data_sample[self.img_field], list):
+            if isinstance(data_sample[self.img_field], np.ndarray):
                 img_path = data_sample[self.img_field][0]
             else:
                 img_path = data_sample[self.img_field]
