@@ -93,16 +93,13 @@ class RTMPose3DLabel(BaseKeypointCodec):
                transformed_keypoints: np.ndarray,
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
+        keypoints_z = transformed_keypoints[..., 2:3]
+        root_z = keypoints_z[:, self.root_index]
         if not self.test_mode:
-
-            keypoints_z = transformed_keypoints[..., 2:]
-            root_z = keypoints_z[..., self.root_index:self.root_index + 1]
             keypoints_z = keypoints_z - root_z
-            keypoints_z = keypoints_z / self.z_max + 1
-
+            keypoints_z = (keypoints_z / self.z_max + 0.5) * self.z_max
             transformed_keypoints = np.concatenate(
                 (transformed_keypoints[..., :2], keypoints_z), axis=-1)
-
             x, y, z, weights = self._generate_gaussian(
                 transformed_keypoints, keypoints_visible)  # noqa
             encoded = dict(
@@ -114,6 +111,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
             encoded = dict(
                 keypoints_3d_gt=keypoints_3d,
                 keypoints_3d_visible=keypoints_visible)
+        encoded['root_z'] = root_z
         return encoded
 
     def decode(self,
@@ -121,6 +119,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
                simcc_y: np.ndarray,
                simcc_z: np.ndarray,
                warp_mat: np.ndarray,
+               root_z: np.ndarray,
                camera_param: dict = None) -> Tuple[np.ndarray, np.ndarray]:
         """Decode keypoints from 3D labels."""
         keypoints, scores = get_simcc_maximum(simcc_x, simcc_y, simcc_z)
@@ -138,7 +137,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
         keypoints_xy = cv2.transform(keypoints_xy, warp_inv)[..., :2]
 
         keypoints_z = keypoints[..., 2:3]
-        keypoints_z = (keypoints_z - 1) * self.z_max
+        keypoints_z = (keypoints_z / self.z_max - 0.5) * self.z_max + root_z
         keypoints = np.concatenate((keypoints_xy, keypoints_z), axis=-1)
 
         # 转换图像空间

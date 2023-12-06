@@ -165,10 +165,11 @@ class RTM3DHead(BaseHead):
                batch_pred_y,
                batch_pred_z,
                batch_warp_mat,
+               batch_root_z,
                camera_params=None):
-        batch_outputs = to_numpy(
-            (batch_pred_x, batch_pred_y, batch_pred_z, batch_warp_mat),
-            unzip=True)
+        batch_outputs = to_numpy((batch_pred_x, batch_pred_y, batch_pred_z,
+                                  batch_warp_mat, batch_root_z),
+                                 unzip=True)
 
         preds = []
         for output, camera_param in zip(batch_outputs, camera_params):
@@ -222,8 +223,13 @@ class RTM3DHead(BaseHead):
         else:
             batch_camera_param = [None for _ in batch_data_samples]
 
+        if batch_data_samples[0].metainfo.get('root_z', None) is not None:
+            batch_root_z = [b.metainfo['root_z'] for b in batch_data_samples]
+        else:
+            batch_root_z = [torch.zeros(1)]
+
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
-                            batch_warp_mat, batch_camera_param)
+                            batch_warp_mat, batch_root_z, batch_camera_param)
 
         return preds
 
