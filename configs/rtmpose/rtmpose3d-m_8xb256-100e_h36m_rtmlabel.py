@@ -171,7 +171,7 @@ train_dataloader = dict(
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=train_pipeline,
-        sample_interval=10))
+        sample_interval=2000))
 val_dataloader = dict(
     batch_size=256,
     num_workers=4,
@@ -184,7 +184,8 @@ val_dataloader = dict(
         data_root=data_root,
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
-        pipeline=val_pipeline))
+        pipeline=val_pipeline,
+        sample_interval=2000))
 test_dataloader = val_dataloader
 
 # hooks
