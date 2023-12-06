@@ -144,9 +144,7 @@ train_pipeline = [
     dict(type='GenerateTarget', encoder=train_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',
-                   'target_root', 'target_root_index', 'target_mean',
-                   'target_std'))
+        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices'))
 ]
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
@@ -155,8 +153,7 @@ val_pipeline = [
     dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('img_path', 'warp_mat', 'z_max', 'z_min', 'camera_param',
-                   'root'))
+        meta_keys=('img_path', 'warp_mat', 'camera_param', 'root'))
 ]
 
 # data loaders

@@ -171,8 +171,7 @@ class RTM3DHead(BaseHead):
             unzip=True)
 
         preds = []
-        for output, z_max, z_min, camera_param in zip(batch_outputs,
-                                                      camera_params):
+        for output, camera_param in zip(batch_outputs, camera_params):
             keypoints, scores = self.decoder.decode(
                 *output, camera_param=camera_param)
             preds.append(
