@@ -224,9 +224,15 @@ class RTM3DHead(BaseHead):
             batch_camera_param = [None for _ in batch_data_samples]
 
         if batch_data_samples[0].metainfo.get('root_z', None) is not None:
-            batch_root_z = [b.metainfo['root_z'] for b in batch_data_samples]
+            batch_root_z = torch.stack([
+                torch.from_numpy(b.metainfo['root_z'])
+                for b in batch_data_samples
+            ])
         else:
-            batch_root_z = [torch.zeros(1)]
+            batch_root_z = torch.stack([
+                torch.empty((0), dtype=torch.float32)
+                for _ in batch_data_samples
+            ])
 
         preds = self.decode(batch_pred_x, batch_pred_y, batch_pred_z,
                             batch_warp_mat, batch_root_z, batch_camera_param)
