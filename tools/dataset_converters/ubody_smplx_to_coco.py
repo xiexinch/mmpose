@@ -285,19 +285,14 @@ def cam2pixel(cam_coord, f, c):
     return np.stack((x, y, z), 1)
 
 
-def convert_smplx_to_coco(joints, target_names, src_names, joints_valid=None):
+def convert_smplx_to_coco(joints, target_names, src_names):
     new_joints = np.zeros((len(target_names), 3), dtype=np.float32)
-    new_joints_valid = None
-    if joints_valid is not None:
-        new_joints_valid = np.zeros((len(target_names)), dtype=np.float32)
     for i, name in enumerate(src_names):
         if name not in target_names:
             continue
         idx = target_names.index(name)
         new_joints[idx, :] = joints[i, :]
-        if joints_valid is not None:
-            new_joints_valid[idx] = joints_valid[i]
-    return new_joints, new_joints_valid
+    return new_joints
 
 
 def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
@@ -343,9 +338,13 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
             human_param['rhand_valid'] = ann['righthand_valid']
             human_param['face_valid'] = ann['face_valid']
 
-        rotation_valid = np.ones((human_model.orig_joint_num),
-                                 dtype=np.float32)
-        coord_valid = np.ones((human_model.joint_num), dtype=np.float32)
+        keypoints_score = np.concatenate(
+            (np.array(ann['keypoints_score']),
+             np.array(ann['foot_kpts_score']),
+             np.array(ann['lefthand_kpts_score']),
+             np.array(ann['righthand_kpts_score']),
+             np.array(ann['face_kpts_score'])))
+        keypoints_valid = (keypoints_score > 0.5).astype(np.uint8).tolist()
 
         root_pose = human_param['root_pose']
         body_pose = human_param['body_pose']
@@ -358,8 +357,6 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
             lhand_pose = np.zeros(
                 (3 * len(human_model.orig_joint_part['lhand'])),
                 dtype=np.float32)
-            rotation_valid[human_model.orig_joint_part['lhand']] = 0
-            coord_valid[human_model.joint_part['lhand']] = 0
 
         if 'rhand_pose' in human_param and human_param['rhand_valid']:
             rhand_pose = human_param['rhand_pose']
@@ -367,8 +364,6 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
             rhand_pose = np.zeros(
                 (3 * len(human_model.orig_joint_part['rhand'])),
                 dtype=np.float32)
-            rotation_valid[human_model.orig_joint_part['rhand']] = 0
-            coord_valid[human_model.joint_part['rhand']] = 0
 
         if 'jaw_pose' in human_param and 'expr' in human_param and human_param[
                 'face_valid']:
@@ -377,8 +372,6 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
         else:
             jaw_pose = np.zeros((3), dtype=np.float32)
             expr = np.zeros((human_model.expr_code_dim), dtype=np.float32)
-            rotation_valid[human_model.orig_joint_part['face']] = 0
-            coord_valid[human_model.joint_part['face']] = 0
 
         # init human model inputs
         device = torch.device(
@@ -430,10 +423,10 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
         joint_img = cam2pixel(joint_cam, cam_param['focal'],
                               cam_param['princpt'])
 
-        joint_img, _ = convert_smplx_to_coco(joint_img, COCO_JOINTS,
-                                             human_model.joints_name)
-        joint_cam, joints_valid = convert_smplx_to_coco(
-            joint_cam, COCO_JOINTS, human_model.joints_name, coord_valid)
+        joint_img = convert_smplx_to_coco(joint_img, COCO_JOINTS,
+                                          human_model.joints_name)
+        joint_cam = convert_smplx_to_coco(joint_cam, COCO_JOINTS,
+                                          human_model.joints_name)
 
         # remove pelvis
         pelvis_idx = COCO_JOINTS.index('Pelvis')
@@ -441,15 +434,13 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
             [joint_img[:pelvis_idx], joint_img[pelvis_idx + 1:]])
         joint_cam = np.concatenate(
             [joint_cam[:pelvis_idx], joint_cam[pelvis_idx + 1:]])
-        joints_valid = np.concatenate(
-            [joints_valid[:pelvis_idx], joints_valid[pelvis_idx + 1:]])
 
         keypoints_2d = joint_img[:, :2].copy()
         keypoints_3d = joint_cam.copy()
 
         ann['keypoints'] = keypoints_2d.tolist()
         ann['keypoints_3d'] = keypoints_3d.tolist()
-        ann['keypoints_valid'] = joints_valid.tolist()
+        ann['keypoints_valid'] = keypoints_valid
         ann['camera_param'] = cam_param
         img['file_name'] = os.path.join(scene, file_name)
         if video_name in splits:
