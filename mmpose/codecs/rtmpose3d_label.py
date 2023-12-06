@@ -100,6 +100,9 @@ class RTMPose3DLabel(BaseKeypointCodec):
             keypoints_z = keypoints_z - root_z
             keypoints_z = keypoints_z / self.z_max + 1
 
+            transformed_keypoints = np.concatenate(
+                (transformed_keypoints[..., :2], keypoints_z), axis=-1)
+
             x, y, z, weights = self._generate_gaussian(
                 transformed_keypoints, keypoints_visible)  # noqa
             encoded = dict(
