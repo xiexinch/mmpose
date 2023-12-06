@@ -223,18 +223,11 @@ class TopdownAffine3D(TopdownAffine):
                 cx, cy = camera_param['c']
                 keypoints_xy = camera_to_pixel(transformed_keypoints, fx, fy,
                                                cx, cy)
-
             # 对3D关键点的(x, y)部分应用仿射变换
             keypoints_z = results['keypoints_3d'][..., 2:3]
             transformed_xy = cv2.transform(keypoints_xy, warp_mat)
-            # 对3D关键点的z部分进行归一化
-            z_max = np.max(results['keypoints_3d'][..., 2:])
-            z_min = np.min(results['keypoints_3d'][..., 2:])
-            transformed_z = (keypoints_z - z_min) / (z_max - z_min) * d
             transformed_keypoints = np.concatenate(
-                (transformed_xy, transformed_z), axis=-1)
-            results['z_max'] = np.array([z_max])
-            results['z_min'] = np.array([z_min])
+                (transformed_xy, keypoints_z), axis=-1)
             results['transformed_keypoints'] = transformed_keypoints
         else:
             results['transformed_keypoints'] = np.zeros((1, 17, 3))
