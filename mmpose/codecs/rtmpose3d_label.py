@@ -85,7 +85,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
 
         self.test_mode = test_mode
 
-        self.z_max = z_max if z_max is not None else input_size[-1]
+        self.z_max = z_max if z_max is not None else 1.7682814598083496
 
     def encode(self,
                keypoints: np.ndarray,
@@ -96,8 +96,8 @@ class RTMPose3DLabel(BaseKeypointCodec):
         keypoints_z = transformed_keypoints[..., 2:3]
         root_z = keypoints_z[:, self.root_index]
         if not self.test_mode:
-            keypoints_z = keypoints_z - root_z
-            keypoints_z = (keypoints_z / self.z_max + 0.5) * self.z_max
+            keypoints_z = ((keypoints_z - root_z) / self.z_max + 1) * (
+                self.input_size[-1] / 2)
             transformed_keypoints = np.concatenate(
                 (transformed_keypoints[..., :2], keypoints_z), axis=-1)
             x, y, z, weights = self._generate_gaussian(
@@ -137,7 +137,8 @@ class RTMPose3DLabel(BaseKeypointCodec):
         keypoints_xy = cv2.transform(keypoints_xy, warp_inv)[..., :2]
 
         keypoints_z = keypoints[..., 2:3]
-        keypoints_z = (keypoints_z / self.z_max - 0.5) * self.z_max + root_z
+        keypoints_z = (keypoints_z /
+                       (self.input_size[-1] / 2) - 1) * self.z_max + root_z
         keypoints = np.concatenate((keypoints_xy, keypoints_z), axis=-1)
 
         # 转换图像空间

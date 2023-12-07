@@ -180,7 +180,7 @@ class SMPLX(object):
             'L_Heel', 'R_Big_toe', 'R_Small_toe', 'R_Heel', 'L_Ear', 'R_Ear',
             'L_Eye', 'R_Eye', 'Nose',
             # left hand joints
-            'L_Thumb_1', 'L_Thumb_2', 'L_Thumb_3', 'L_Thumb4', 'L_Index_1',
+            'L_Thumb_1', 'L_Thumb_2', 'L_Thumb_3', 'L_Thumb_4', 'L_Index_1',
             'L_Index_2', 'L_Index_3', 'L_Index_4', 'L_Middle_1', 'L_Middle_2',
             'L_Middle_3', 'L_Middle_4', 'L_Ring_1', 'L_Ring_2', 'L_Ring_3',
             'L_Ring_4', 'L_Pinky_1', 'L_Pinky_2', 'L_Pinky_3', 'L_Pinky_4',
@@ -427,6 +427,14 @@ def process_scene_anno(scene: str, annotation_root: str, splits: np.array,
                                           human_model.joints_name)
         joint_cam = convert_smplx_to_coco(joint_cam, COCO_JOINTS,
                                           human_model.joints_name)
+        joint_img[COCO_JOINTS.index('L_Wrist_Hand')] = joint_img[
+            COCO_JOINTS.index('L_Wrist')]
+        joint_img[COCO_JOINTS.index('R_Wrist_Hand')] = joint_img[
+            COCO_JOINTS.index('R_Wrist')]
+        joint_cam[COCO_JOINTS.index('L_Wrist_Hand')] = joint_cam[
+            COCO_JOINTS.index('L_Wrist')]
+        joint_cam[COCO_JOINTS.index('R_Wrist_Hand')] = joint_cam[
+            COCO_JOINTS.index('R_Wrist')]
 
         # remove pelvis
         pelvis_idx = COCO_JOINTS.index('Pelvis')
