@@ -188,7 +188,7 @@ class UBody3dDataset(BaseMocapDataset):
             img_ids = []
             kpts = np.zeros((len(anns), num_keypoints, 2), dtype=np.float32)
             kpts_3d = np.zeros((len(anns), num_keypoints, 3), dtype=np.float32)
-            keypoints_visible = np.zeros((len(anns), num_keypoints, 1),
+            keypoints_visible = np.zeros((len(anns), num_keypoints),
                                          dtype=np.float32)
             scales = np.zeros((len(anns), 2), dtype=np.float32)
             centers = np.zeros((len(anns), 2), dtype=np.float32)
