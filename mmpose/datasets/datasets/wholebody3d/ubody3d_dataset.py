@@ -205,7 +205,6 @@ class UBody3dDataset(BaseMocapDataset):
                     centers[j] = np.array(ann['center'])
 
             imgs = self.ann_data.loadImgs(img_ids)
-            keypoints_visible = keypoints_visible.squeeze(-1)
 
             img_paths = np.array([img['file_name'] for img in imgs])
             factors = np.zeros((kpts_3d.shape[0], ), dtype=np.float32)
