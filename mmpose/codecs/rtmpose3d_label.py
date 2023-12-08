@@ -111,6 +111,8 @@ class RTMPose3DLabel(BaseKeypointCodec):
             encoded = dict(
                 keypoints_3d_gt=keypoints_3d,
                 keypoints_3d_visible=keypoints_visible)
+        if np.allclose(keypoints_3d, np.zeros((1, 17, 3))):
+            root_z = np.array([self.z_max])
         encoded['root_z'] = root_z
         return encoded
 
