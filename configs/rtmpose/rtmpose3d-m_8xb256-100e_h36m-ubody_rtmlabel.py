@@ -38,20 +38,20 @@ auto_scale_lr = dict(base_batch_size=2048)
 
 # codec settings
 train_codec = dict(
-    type='Naive3DLabel',
-    input_size=(192, 256, 192),
+    type='RTMPose3DLabel',
+    input_size=(192, 256, 256),
     simcc_split_ratio=2.0,
-    sigma=(4.9, 5.66, 4.9),
-    normalize=False)
+    sigma=(4.9, 5.66, 5.66),
+    normalize=False,
+    root_index=0)
 
 val_codec = dict(
-    type='Naive3DLabel',
-    input_size=(192, 256, 192),
+    type='RTMPose3DLabel',
+    input_size=(192, 256, 256),
     simcc_split_ratio=2.0,
-    sigma=(4.9, 5.66, 4.9),
+    sigma=(4.9, 5.66, 5.66),
     normalize=False,
-    test_mode=True,
-    gt_field='keypoints_3d_gt')
+    test_mode=True)
 
 # model settings
 model = dict(
