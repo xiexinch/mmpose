@@ -138,6 +138,7 @@ for scene in scenes:
         causal=True,
         seq_len=1,
         data_prefix=dict(img='images/'),
+        subset_frac=0.1,
         pipeline=[
             dict(
                 type='KeypointCombiner',

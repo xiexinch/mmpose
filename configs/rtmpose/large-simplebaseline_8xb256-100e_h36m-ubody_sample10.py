@@ -106,8 +106,9 @@ model = dict(
     ))
 
 # base dataset settings
-dataset_type = 'Human36mDataset'
-data_root = 'data/h36m/'
+dataset_type = 'UBody3dDataset'
+data_root = 'data/UBody/'
+data_mode = 'topdown'
 
 # pipelines
 train_pipeline = [
@@ -134,10 +135,11 @@ for scene in scenes:
         type='UBody3dDataset',
         data_root='data/UBody/',
         ann_file=train_ann,
-        data_mode='topdown',
+        data_mode=data_mode,
         causal=True,
         seq_len=1,
         data_prefix=dict(img='images/'),
+        subset_frac=0.1,
         pipeline=[
             dict(
                 type='KeypointCombiner',
@@ -151,6 +153,19 @@ for scene in scenes:
                 ])
         ])
     train_datasets.append(train_dataset)
+
+h36m_train_dataset = dict(
+    type='Human36mDataset',
+    ann_file='annotation_body3d/fps50/h36m_train.npz',
+    seq_len=1,
+    subset_frac=0.1,
+    causal=True,
+    keypoint_2d_src='gt',
+    data_root='data/h36m/',
+    data_prefix=dict(img='images/'),
+    pipeline=[],
+)
+train_datasets.append(h36m_train_dataset)
 
 # data loaders
 train_dataloader = dict(

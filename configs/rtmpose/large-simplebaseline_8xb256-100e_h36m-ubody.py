@@ -139,7 +139,6 @@ for scene in scenes:
         causal=True,
         seq_len=1,
         data_prefix=dict(img='images/'),
-        subset_frac=0.1,
         pipeline=[
             dict(
                 type='KeypointCombiner',
@@ -158,7 +157,6 @@ h36m_train_dataset = dict(
     type='Human36mDataset',
     ann_file='annotation_body3d/fps50/h36m_train.npz',
     seq_len=1,
-    subset_frac=0.1,
     causal=True,
     keypoint_2d_src='gt',
     data_root='data/h36m/',

@@ -120,53 +120,23 @@ train_pipeline = [
 ]
 val_pipeline = train_pipeline
 
-scenes = [
-    'Magic_show', 'Entertainment', 'ConductMusic', 'Online_class', 'TalkShow',
-    'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
-    'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
-]
-skip_scenes = ['Speech', 'Movie']
-
-train_datasets = []
-for scene in scenes:
-    train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
-    train_dataset = dict(
-        type='UBody3dDataset',
-        data_root='data/UBody/',
-        ann_file=train_ann,
-        data_mode='topdown',
-        causal=True,
-        seq_len=1,
-        data_prefix=dict(img='images/'),
-        pipeline=[
-            dict(
-                type='KeypointCombiner',
-                num_keypoints=17,
-                mapping=[((11, 12), 0), (12, 1), (14, 2), (16, 3), (11, 4),
-                         (13, 5), (15, 6), ((5, 6, 11, 12), 7), ((5, 6), 8),
-                         (0, 9), ((1, 2), 10), (5, 11), (7, 12), (9, 13),
-                         (6, 14), (8, 15), (10, 16)],
-                flip_indices=[
-                    0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
-                ])
-        ])
-    train_datasets.append(train_dataset)
-
 # data loaders
 train_dataloader = dict(
     batch_size=256,
     num_workers=10,
-    prefetch_factor=4,
-    pin_memory=True,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
-        type='CombinedDataset',
-        datasets=train_datasets,
+        type=dataset_type,
+        ann_file='annotation_body3d/fps50/h36m_train.npz',
+        seq_len=1,
+        causal=True,
+        subset_frac=0.1,
+        keypoint_2d_src='gt',
+        data_root=data_root,
+        data_prefix=dict(img='images/'),
         pipeline=train_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
-        test_mode=False))
-
+    ))
 val_dataloader = dict(
     batch_size=256,
     num_workers=10,
@@ -174,12 +144,12 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type='Human36mDataset',
+        type=dataset_type,
         ann_file='annotation_body3d/fps50/h36m_test.npz',
         seq_len=1,
         causal=True,
         keypoint_2d_src='gt',
-        data_root='data/h36m/',
+        data_root=data_root,
         data_prefix=dict(img='images/'),
         pipeline=train_pipeline,
     ))
