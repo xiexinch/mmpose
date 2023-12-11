@@ -103,17 +103,17 @@ model = dict(
         decoder=val_codec),
     test_cfg=dict(flip_test=False))
 
-# data settings
-dataset_type = 'UBody3DCOCODataset'
+# base dataset settings
+dataset_type = 'H36MCOCODataset'
 data_mode = 'topdown'
-data_root = 'data/UBody/'
+data_root = 'data/h36m/'
 
 backend_args = dict(backend='local')
 # backend_args = dict(
 #     backend='petrel',
 #     path_mapping=dict({
-#         f'{data_root}': 's3://openmmlab/datasets/pose/UBody/',
-#         f'{data_root}': 's3://openmmlab/datasets/pose/UBody/'
+#         f'{data_root}': 's3://openmmlab/datasets/detection/coco/',
+#         f'{data_root}': 's3://openmmlab/datasets/detection/coco/'
 #     }))
 
 # pipelines
@@ -144,11 +144,8 @@ train_pipeline = [
     dict(type='GenerateTarget', encoder=train_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',
-                   'target_root', 'target_root_index', 'target_mean',
-                   'target_std'))
+        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices'))
 ]
-
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
@@ -156,40 +153,10 @@ val_pipeline = [
     dict(type='GenerateTarget', encoder=val_codec),
     dict(
         type='PackPoseInputs',
-        meta_keys=('img_path', 'warp_mat', 'z_max', 'z_min', 'camera_param',
-                   'root'))
+        meta_keys=('img_path', 'warp_mat', 'camera_param', 'root_z'))
 ]
 
-scenes = [
-    'Magic_show', 'Entertainment', 'ConductMusic', 'Online_class', 'TalkShow',
-    'Speech', 'Fitness', 'Interview', 'Olympic', 'TVShow', 'Singing',
-    'SignLanguage', 'Movie', 'LiveVlog', 'VideoConference'
-]
-skip_scenes = ['Speech', 'Movie']
-
-train_datasets = []
-for scene in scenes:
-    train_ann = f'annotations/{scene}/train_3dkeypoint_annotation.json'
-    train_dataset = dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=train_ann,
-        data_mode=data_mode,
-        data_prefix=dict(img='images/'),
-        pipeline=[
-            dict(
-                type='KeypointCombiner',
-                num_keypoints=17,
-                mapping=[((11, 12), 0), (12, 1), (14, 2), (16, 3), (11, 4),
-                         (13, 5), (15, 6), ((5, 6, 11, 12), 7), ((5, 6), 8),
-                         (0, 9), ((1, 2), 10), (5, 11), (7, 12), (9, 13),
-                         (6, 14), (8, 15), (10, 16)],
-                flip_indices=[
-                    0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
-                ])
-        ])
-    train_datasets.append(train_dataset)
-
+# data loaders
 train_dataloader = dict(
     batch_size=256,
     num_workers=10,
@@ -198,11 +165,13 @@ train_dataloader = dict(
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
-        type='CombinedDataset',
-        datasets=train_datasets,
+        type=dataset_type,
+        ann_file='annotation_body2d/h36m_coco_train_fps50.json',
+        data_root=data_root,
+        data_prefix=dict(img='images/'),
+        camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=train_pipeline,
-        metainfo=dict(from_file='configs/_base_/datasets/h36m.py'),
-        test_mode=False))
+        sample_interval=10))
 val_dataloader = dict(
     batch_size=256,
     num_workers=4,
@@ -210,9 +179,9 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type='H36MCOCODataset',
+        type=dataset_type,
         ann_file='annotation_body2d/h36m_test_fps50.json',
-        data_root='data/h36m/',
+        data_root=data_root,
         data_prefix=dict(img='images/'),
         camera_param_file='annotation_body3d/cameras.pkl',
         pipeline=val_pipeline))
@@ -238,17 +207,17 @@ custom_hooks = [
 # evaluators
 val_evaluator = [
     dict(
-        type='SimpleMPJPE',
+        type='MPJPE',
         mode='mpjpe',
-        pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_3d_visible'),
+        gt_mask_field='keypoints_3d_visible',
+        img_field='img_path'),
     dict(
-        type='SimpleMPJPE',
+        type='MPJPE',
         mode='p-mpjpe',
-        pred_field='keypoints',
         gt_field='keypoints_3d_gt',
-        gt_mask_field='keypoints_3d_visible')
+        gt_mask_field='keypoints_3d_visible',
+        img_field='img_path')
 ]
 test_evaluator = val_evaluator
 

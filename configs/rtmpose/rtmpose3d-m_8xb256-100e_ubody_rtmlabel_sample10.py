@@ -187,7 +187,8 @@ for scene in scenes:
                 flip_indices=[
                     0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
-        ])
+        ],
+        sample_interval=10)
     train_datasets.append(train_dataset)
 
 train_dataloader = dict(

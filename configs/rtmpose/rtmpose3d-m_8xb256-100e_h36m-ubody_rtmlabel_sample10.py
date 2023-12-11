@@ -38,20 +38,20 @@ auto_scale_lr = dict(base_batch_size=2048)
 
 # codec settings
 train_codec = dict(
-    type='RTMPose3DLabel',
-    input_size=(192, 256, 256),
+    type='Naive3DLabel',
+    input_size=(192, 256, 192),
     simcc_split_ratio=2.0,
-    sigma=(4.9, 5.66, 5.66),
-    normalize=False,
-    root_index=0)
+    sigma=(4.9, 5.66, 4.9),
+    normalize=False)
 
 val_codec = dict(
-    type='RTMPose3DLabel',
-    input_size=(192, 256, 256),
+    type='Naive3DLabel',
+    input_size=(192, 256, 192),
     simcc_split_ratio=2.0,
-    sigma=(4.9, 5.66, 5.66),
+    sigma=(4.9, 5.66, 4.9),
     normalize=False,
-    test_mode=True)
+    test_mode=True,
+    gt_field='keypoints_3d_gt')
 
 # model settings
 model = dict(
@@ -187,8 +187,20 @@ for scene in scenes:
                 flip_indices=[
                     0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
-        ])
+        ],
+        sample_interval=10)
     train_datasets.append(train_dataset)
+
+h36m_train_dataset = dict(
+    type='H36MCOCODataset',
+    ann_file='annotation_body2d/h36m_coco_train_fps50.json',
+    data_root='data/h36m/',
+    data_prefix=dict(img='images/'),
+    camera_param_file='annotation_body3d/cameras.pkl',
+    pipeline=[],
+    sample_interval=10)
+
+train_datasets.append(h36m_train_dataset)
 
 train_dataloader = dict(
     batch_size=256,

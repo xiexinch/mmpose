@@ -187,8 +187,7 @@ for scene in scenes:
                 flip_indices=[
                     0, 4, 5, 6, 1, 2, 3, 7, 8, 9, 10, 14, 15, 16, 11, 12, 13
                 ])
-        ],
-        sample_interval=10)
+        ])
     train_datasets.append(train_dataset)
 
 h36m_train_dataset = dict(
@@ -197,8 +196,7 @@ h36m_train_dataset = dict(
     data_root='data/h36m/',
     data_prefix=dict(img='images/'),
     camera_param_file='annotation_body3d/cameras.pkl',
-    pipeline=[],
-    sample_interval=10)
+    pipeline=[])
 
 train_datasets.append(h36m_train_dataset)
 
