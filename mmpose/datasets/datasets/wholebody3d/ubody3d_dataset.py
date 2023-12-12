@@ -7,7 +7,6 @@ import numpy as np
 from mmengine.fileio import get_local_path
 from xtcocotools.coco import COCO
 
-from mmpose.codecs.utils import pixel_to_camera
 from mmpose.datasets.datasets import BaseMocapDataset
 from mmpose.registry import DATASETS
 
@@ -218,14 +217,12 @@ class UBody3dDataset(BaseMocapDataset):
                 cam_param['w'] = 1000
                 cam_param['h'] = 1000
 
-            fx, fy = cam_param['focal']
-            cx, cy = cam_param['princpt']
-            keypoints_3d_cam = pixel_to_camera(kpts_3d, fx, fy, cx, cy)
+            cam_param = {'f': cam_param['focal'], 'c': cam_param['princpt']}
 
             instance_info = {
                 'num_keypoints': num_keypoints,
                 'keypoints': kpts,
-                'keypoints_3d': keypoints_3d_cam,
+                'keypoints_3d': kpts_3d,
                 'keypoints_visible': keypoints_visible,
                 'scale': scales,
                 'center': centers,
@@ -234,7 +231,7 @@ class UBody3dDataset(BaseMocapDataset):
                 'iscrowd': 0,
                 'img_paths': list(img_paths),
                 'img_ids': [img['id'] for img in imgs],
-                'lifting_target': keypoints_3d_cam[target_idx],
+                'lifting_target': kpts_3d[target_idx],
                 'lifting_target_visible': keypoints_visible[target_idx],
                 'target_img_paths': list(img_paths[target_idx]),
                 'camera_param': cam_param,
