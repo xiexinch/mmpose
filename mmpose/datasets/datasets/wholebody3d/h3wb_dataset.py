@@ -339,11 +339,12 @@ class H3WBDataset(BaseMocapDataset):
                     camera_param = self._metadata[subject][cam]
                     seq_step = 1
                     _len = (self.seq_len - 1) * seq_step + 1
-                    _indices = range(len(self.ann_data[subject][act][cam]))
+                    _indices = list(
+                        range(len(self.ann_data[subject][act]['frame_id'])))
                     seq_indices = [
                         _indices[i:(i + _len):seq_step]
-                        for i in range(0,
-                                       len(_indices) - _len + 1)
+                        for i in list(range(0,
+                                            len(_indices) - _len + 1))
                     ]
 
                     for idx, frame_ids in enumerate(seq_indices):
@@ -370,7 +371,7 @@ class H3WBDataset(BaseMocapDataset):
                             'keypoints':
                             _kpts_2d,
                             'keypoints_3d':
-                            _kpts_3d,
+                            _kpts_3d / 1000,
                             'keypoints_visible':
                             np.ones_like(_kpts_2d[..., 0], dtype=np.float32),
                             'keypoints_3d_visible':
@@ -396,7 +397,7 @@ class H3WBDataset(BaseMocapDataset):
                             'img_ids':
                             frame_ids,
                             'lifting_target':
-                            _kpts_3d[target_idx],
+                            _kpts_3d[target_idx] / 1000,
                             'lifting_target_visible':
                             np.ones_like(_kpts_2d[..., 0],
                                          dtype=np.float32)[target_idx],
