@@ -2,12 +2,13 @@
 import json
 import logging
 import os.path as osp
-from typing import List, Tuple
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 from mmengine.fileio import get_local_path
 from mmengine.logging import print_log
 
+from mmpose.datasets.datasets import BaseMocapDataset
 from mmpose.registry import DATASETS
 from ..body3d import Human36mDataset
 
@@ -253,3 +254,115 @@ class H36MWholeBodyDataset(Human36mDataset):
         kpts_2d = np.array([[j['x'], j['y']] for _, j in kpts_2d.items()],
                            dtype=np.float32)[np.newaxis, ...]
         return kpts_2d, kpts_3d
+
+
+@DATASETS.register_module()
+class H3WBDataset(BaseMocapDataset):
+
+    METAINFO: dict = dict(from_file='configs/_base_/datasets/h3wb.py')
+
+    def __init__(
+        self,
+        ann_file: str = '',
+        seq_len: int = 1,
+        multiple_target: int = 0,
+        causal: bool = True,
+        subset_frac: float = 1.0,
+        camera_param_file: Optional[str] = None,
+        data_mode: str = 'topdown',
+        metainfo: Optional[dict] = None,
+        data_root: Optional[str] = None,
+        data_prefix: dict = dict(img=''),
+        filter_cfg: Optional[dict] = None,
+        indices: Optional[Union[int, Sequence[int]]] = None,
+        serialize_data: bool = True,
+        pipeline: List[Union[dict, Callable]] = [],
+        test_mode: bool = False,
+        lazy_init: bool = False,
+        max_refetch: int = 1000,
+        train_mode: bool = True,
+    ):
+
+        assert seq_len == 1, 'H3WB dataset only support seq_len==1'
+        assert data_mode == 'topdown'
+
+        super().__init__(
+            ann_file=ann_file,
+            seq_len=seq_len,
+            multiple_target=multiple_target,
+            causal=causal,
+            subset_frac=subset_frac,
+            camera_param_file=camera_param_file,
+            data_mode=data_mode,
+            metainfo=metainfo,
+            data_root=data_root,
+            data_prefix=data_prefix,
+            filter_cfg=filter_cfg,
+            indices=indices,
+            serialize_data=serialize_data,
+            pipeline=pipeline,
+            test_mode=test_mode,
+            lazy_init=lazy_init,
+            max_refetch=max_refetch)
+
+        self.camera_order_id = ['54138969', '55011271', '58860488', '60457274']
+        if train_mode:
+            self.subjects = ['S1', 'S5', 'S6']
+        else:
+            self.subjects = ['S7']
+
+    def _load_ann_file(self, ann_file: str) -> dict:
+        with get_local_path(ann_file) as local_path:
+            data = np.load(local_path, allow_pickle=True)
+
+        self.ann_data = data['train_data'].item()
+        self._metadata = data['metadata'].item()
+
+    def get_sequence_indices(self) -> List[List[int]]:
+        return []
+
+    def _load_annotations(self) -> Tuple[List[dict], List[dict]]:
+
+        instance_list = []
+        image_list = []
+
+        instance_id = 0
+        for subject in self.subjects:
+            actions = self.ann_data[subject].keys()
+            for act in actions:
+                for cam in self.camera_order_id:
+                    keypoints_2d = self.ann_data[subject][act][cam]['pose_2d']
+                    keypoints_3d = self.ann_data[subject][act][cam][
+                        'camera_3d']
+                    num_keypoints = keypoints_2d.shape[1]
+                    person_nums = keypoints_2d.shape[0]
+
+                    camera_param = self._metadata[subject][cam]
+
+                    instances = [{
+                        'num_keypoints':
+                        num_keypoints,
+                        'keypoints':
+                        keypoints_2d[i],
+                        'keypoints_3d':
+                        keypoints_3d[i] / 1000,
+                        'keypoints_visible':
+                        np.ones((1, num_keypoints)),
+                        'id':
+                        instance_id + i,
+                        'category_id':
+                        1,
+                        'iscrowd':
+                        0,
+                        'lifting_target':
+                        keypoints_3d[[i]] / 1000,
+                        'lifting_target_visible':
+                        np.ones((1, num_keypoints)),
+                        'camera_param':
+                        camera_param,
+                        'target_idx': [-1]
+                    } for i in range(person_nums)]
+
+                    instance_list += instances
+
+        return instance_list, image_list
