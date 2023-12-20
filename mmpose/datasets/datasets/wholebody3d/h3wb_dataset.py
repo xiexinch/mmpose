@@ -286,6 +286,12 @@ class H3WBDataset(BaseMocapDataset):
         # assert seq_len == 1, 'H3WB dataset only support seq_len==1'
         assert data_mode == 'topdown'
 
+        self.camera_order_id = ['54138969', '55011271', '58860488', '60457274']
+        if train_mode:
+            self.subjects = ['S1', 'S5', 'S6']
+        else:
+            self.subjects = ['S7']
+
         super().__init__(
             ann_file=ann_file,
             seq_len=seq_len,
@@ -304,12 +310,6 @@ class H3WBDataset(BaseMocapDataset):
             test_mode=test_mode,
             lazy_init=lazy_init,
             max_refetch=max_refetch)
-
-        self.camera_order_id = ['54138969', '55011271', '58860488', '60457274']
-        if train_mode:
-            self.subjects = ['S1', 'S5', 'S6']
-        else:
-            self.subjects = ['S7']
 
     def _load_ann_file(self, ann_file: str) -> dict:
         with get_local_path(ann_file) as local_path:
