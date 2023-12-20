@@ -283,7 +283,7 @@ class H3WBDataset(BaseMocapDataset):
         train_mode: bool = True,
     ):
 
-        assert seq_len == 1, 'H3WB dataset only support seq_len==1'
+        # assert seq_len == 1, 'H3WB dataset only support seq_len==1'
         assert data_mode == 'topdown'
 
         super().__init__(
@@ -335,34 +335,80 @@ class H3WBDataset(BaseMocapDataset):
                     keypoints_3d = self.ann_data[subject][act][cam][
                         'camera_3d']
                     num_keypoints = keypoints_2d.shape[1]
-                    person_nums = keypoints_2d.shape[0]
 
                     camera_param = self._metadata[subject][cam]
+                    seq_step = 1
+                    _len = (self.seq_len - 1) * seq_step + 1
+                    _indices = range(len(self.ann_data[subject][act][cam]))
+                    seq_indices = [
+                        _indices[i:(i + _len):seq_step]
+                        for i in range(0,
+                                       len(_indices) - _len + 1)
+                    ]
 
-                    instances = [{
-                        'num_keypoints':
-                        num_keypoints,
-                        'keypoints':
-                        keypoints_2d[i],
-                        'keypoints_3d':
-                        keypoints_3d[i] / 1000,
-                        'keypoints_visible':
-                        np.ones((1, num_keypoints)),
-                        'id':
-                        instance_id + i,
-                        'category_id':
-                        1,
-                        'iscrowd':
-                        0,
-                        'lifting_target':
-                        keypoints_3d[[i]] / 1000,
-                        'lifting_target_visible':
-                        np.ones((1, num_keypoints)),
-                        'camera_param':
-                        camera_param,
-                        'target_idx': [-1]
-                    } for i in range(person_nums)]
+                    for idx, frame_ids in enumerate(seq_indices):
+                        expected_num_frames = self.seq_len
+                        if self.multiple_target:
+                            expected_num_frames = self.multiple_target
 
-                    instance_list += instances
+                        assert len(frame_ids) == (expected_num_frames), (
+                            f'Expected `frame_ids` == {expected_num_frames}, but '  # noqa
+                            f'got {len(frame_ids)} ')
+
+                        _kpts_2d = keypoints_2d[frame_ids]
+                        _kpts_3d = keypoints_3d[frame_ids]
+
+                        target_idx = [-1] if self.causal else [
+                            int(self.seq_len) // 2
+                        ]
+                        if self.multiple_target > 0:
+                            target_idx = list(range(self.multiple_target))
+
+                        instance_info = {
+                            'num_keypoints':
+                            num_keypoints,
+                            'keypoints':
+                            _kpts_2d,
+                            'keypoints_3d':
+                            _kpts_3d,
+                            'keypoints_visible':
+                            np.ones_like(_kpts_2d[..., 0], dtype=np.float32),
+                            'keypoints_3d_visible':
+                            np.ones_like(_kpts_2d[..., 0], dtype=np.float32),
+                            'scale':
+                            np.zeros((1, 1), dtype=np.float32),
+                            'center':
+                            np.zeros((1, 2), dtype=np.float32),
+                            'factor':
+                            np.zeros((1, 1), dtype=np.float32),
+                            'id':
+                            instance_id,
+                            'category_id':
+                            1,
+                            'iscrowd':
+                            0,
+                            'camera_param':
+                            camera_param,
+                            'img_paths': [
+                                f'{subject}/{act}/{cam}/{i:06d}.jpg'
+                                for i in frame_ids
+                            ],
+                            'img_ids':
+                            frame_ids,
+                            'lifting_target':
+                            _kpts_3d[target_idx],
+                            'lifting_target_visible':
+                            np.ones_like(_kpts_2d[..., 0],
+                                         dtype=np.float32)[target_idx],
+                        }
+                        instance_list.append(instance_info)
+
+                        if self.data_mode == 'bottomup':
+                            for idx, img_name in enumerate(
+                                    instance_info['img_paths']):
+                                img_info = self.get_img_info(idx, img_name)
+                                image_list.append(img_info)
+
+                        instance_id += 1
 
         return instance_list, image_list
