@@ -282,8 +282,6 @@ class H3WBDataset(BaseMocapDataset):
         max_refetch: int = 1000,
         train_mode: bool = True,
     ):
-
-        # assert seq_len == 1, 'H3WB dataset only support seq_len==1'
         assert data_mode == 'topdown'
 
         self.camera_order_id = ['54138969', '55011271', '58860488', '60457274']
@@ -337,6 +335,13 @@ class H3WBDataset(BaseMocapDataset):
                     num_keypoints = keypoints_2d.shape[1]
 
                     camera_param = self._metadata[subject][cam]
+                    camera_param = {
+                        'K': camera_param['K'][0, :2, ...],
+                        'R': camera_param['R'][0],
+                        'T': camera_param['T'].reshape(3, 1),
+                        'Distortion': camera_param['Distortion'][0]
+                    }
+
                     seq_step = 1
                     _len = (self.seq_len - 1) * seq_step + 1
                     _indices = list(
