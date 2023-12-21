@@ -23,12 +23,13 @@ def convert_keypoint_definition(keypoints, pose_det_dataset,
         ndarray[K, 2 or 3]: the transformed 2D keypoints.
     """
     assert pose_lift_dataset in [
-        'h36m', 'h3wb'], '`pose_lift_dataset` should be ' \
+        'h36m', 'h3wb', 'coco_wholebody'], '`pose_lift_dataset` should be ' \
         f'`h36m`, but got {pose_lift_dataset}.'
 
-    keypoints_new = np.zeros((keypoints.shape[0], 17, keypoints.shape[2]),
-                             dtype=keypoints.dtype)
-    if pose_lift_dataset in ['h36m', 'h3wb']:
+    keypoints_new = np.zeros(
+        (keypoints.shape[0], keypoints.shape[1], keypoints.shape[2]),
+        dtype=keypoints.dtype)
+    if pose_lift_dataset in ['h36m', 'h3wb', 'coco_wholebody']:
         if pose_det_dataset in ['h36m', 'coco_wholebody']:
             keypoints_new = keypoints
         elif pose_det_dataset in ['coco', 'posetrack18']:
