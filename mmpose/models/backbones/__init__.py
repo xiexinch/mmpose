@@ -18,6 +18,7 @@ from .resnest import ResNeSt
 from .resnet import ResNet, ResNetV1d
 from .resnext import ResNeXt
 from .rsn import RSN
+from .rtt import LargeSimpleBaseline
 from .scnet import SCNet
 from .seresnet import SEResNet
 from .seresnext import SEResNeXt
@@ -37,5 +38,5 @@ __all__ = [
     'MSPN', 'ResNeSt', 'VGG', 'TCN', 'ViPNAS_ResNet', 'ViPNAS_MobileNetV3',
     'LiteHRNet', 'V2VNet', 'HRFormer', 'PyramidVisionTransformer',
     'PyramidVisionTransformerV2', 'SwinTransformer', 'DSTFormer', 'CSPDarknet',
-    'CSPNeXt'
+    'CSPNeXt', 'LargeSimpleBaseline'
 ]
