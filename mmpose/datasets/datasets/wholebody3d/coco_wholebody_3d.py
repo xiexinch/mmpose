@@ -1,0 +1,62 @@
+# Copyright (c) OpenMMLab. All rights reserved.
+from typing import List, Tuple
+
+import numpy as np
+from mmengine.fileio import get_local_path
+
+from mmpose.datasets.datasets import BaseMocapDataset
+from mmpose.registry import DATASETS
+
+
+@DATASETS.register_module()
+class COCOWholebody3D(BaseMocapDataset):
+
+    METAINFO: dict = dict(
+        from_file='configs/_base_/datasets/coco_wholebody.py')
+
+    def _load_ann_file(self, ann_file: str) -> dict:
+        with get_local_path(ann_file) as local_path:
+            data = np.load(local_path, allow_pickle=True)
+        self.ann_data = list(data['annotations'])
+        self.images = list(data['images'])
+
+    def get_sequence_indices(self) -> List[List[int]]:
+        assert self.seq_len == 1, 'Sequence length must be 1 for COCO dataset'
+        return []
+
+    def _load_annotations(self) -> Tuple[List[dict], List[dict]]:
+
+        instance_list = []
+        image_list = []
+
+        for i, ann in enumerate(self.ann_data):
+            num_keypoints = self.metainfo['num_keypoints']
+
+            kpts_2d = np.array(ann['keypoints_2d']).reshape(1, -1, 2)
+            kpts_3d = np.array(ann['keypoints_3d']).reshape(1, -1, 3)
+            keypoints_visible = np.array(ann['keypoints_valid']).reshape(1, -1)
+            camera_param = {
+                'f': ann['camera_param']['focal'],
+                'c': ann['camera_param']['princpt'],
+                'w': self.images[i]['width'],
+                'h': self.images[i]['height']
+            }
+            instance_info = {
+                'num_keypoints': num_keypoints,
+                'keypoints': kpts_2d,
+                'keypoints_3d': kpts_3d,
+                'keypoints_visible': keypoints_visible,
+                'factors': np.zeros((kpts_3d.shape[0], ), dtype=np.float32),
+                'id': i,
+                'category_id': 1,
+                'iscrowd': 0,
+                'img_paths': [ann['image_path']],
+                'img_ids': [self.images[i]['id']],
+                'lifting_target': kpts_3d,
+                'lifting_target_visible': keypoints_visible,
+                'target_img_path': [ann['image_path']],
+                'camera_param': camera_param
+            }
+            instance_list.append(instance_info)
+
+        return instance_list, image_list
