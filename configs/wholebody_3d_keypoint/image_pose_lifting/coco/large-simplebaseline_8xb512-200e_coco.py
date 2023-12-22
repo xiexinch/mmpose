@@ -11,12 +11,23 @@ train_cfg = dict(max_epochs=100, val_interval=10)
 
 # optimizer
 optim_wrapper = dict(
-    optimizer=dict(type='Adam', lr=1e-3),
+    dict(
+        type='AdamW',
+        lr=0.0001,
+        weight_decay=0.05,
+        eps=1e-8,
+        betas=(0.9, 0.999)),
     clip_grad=dict(max_norm=0.1, norm_type=2))
 
 # learning policy
 param_scheduler = [
-    dict(type='StepLR', step_size=100000, gamma=0.96, end=80, by_epoch=False)
+    dict(
+        type='PolyLR',
+        eta_min=0,
+        power=0.9,
+        begin=0,
+        end=100000,
+        by_epoch=False)
 ]
 
 auto_scale_lr = dict(base_batch_size=4096)
