@@ -32,9 +32,12 @@ class COCOWholebody3D(BaseMocapDataset):
         for i, ann in enumerate(self.ann_data):
             num_keypoints = self.metainfo['num_keypoints']
 
-            kpts_2d = np.array(ann['keypoints_2d']).reshape(1, -1, 2)
-            kpts_3d = np.array(ann['keypoints_3d']).reshape(1, -1, 3)
-            keypoints_visible = np.array(ann['keypoints_valid']).reshape(1, -1)
+            kpts_2d = np.array(
+                ann['keypoints_2d'], dtype=np.float32).reshape(1, -1, 2)
+            kpts_3d = np.array(
+                ann['keypoints_3d'], dtype=np.float32).reshape(1, -1, 3)
+            keypoints_visible = np.array(
+                ann['keypoints_valid'], dtype=np.float32).reshape(1, -1)
             camera_param = {
                 'f': ann['camera_param']['focal'],
                 'c': ann['camera_param']['princpt'],
