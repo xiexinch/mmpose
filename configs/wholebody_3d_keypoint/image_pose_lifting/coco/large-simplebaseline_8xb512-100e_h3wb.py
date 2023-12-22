@@ -10,7 +10,9 @@ visualizer = dict(
 train_cfg = dict(max_epochs=100, val_interval=10)
 
 # optimizer
-optim_wrapper = dict(optimizer=dict(type='Adam', lr=1e-3))
+optim_wrapper = dict(
+    optimizer=dict(type='Adam', lr=1e-3),
+    clip_grad=dict(max_norm=0.1, norm_type=2))
 
 # learning policy
 param_scheduler = [
