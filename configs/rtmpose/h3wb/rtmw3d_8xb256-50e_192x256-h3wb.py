@@ -1,4 +1,4 @@
-_base_ = ['../../../_base_/default_runtime.py']
+_base_ = ['../../_base_/default_runtime.py']
 
 # runtime
 max_epochs = 270
@@ -110,7 +110,7 @@ train_pipeline = [
     dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
-    dict(type='TopdownAffine', input_size=codec['input_size']),
+    dict(type='TopdownAffine3D', input_size=codec['input_size']),
     dict(type='mmdet.YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
@@ -133,7 +133,7 @@ train_pipeline = [
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='TopdownAffine', input_size=codec['input_size']),
+    dict(type='TopdownAffine3D', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 
@@ -147,7 +147,7 @@ train_pipeline_stage2 = [
         shift_factor=0.,
         scale_factor=[0.75, 1.25],
         rotate_factor=60),
-    dict(type='TopdownAffine', input_size=codec['input_size']),
+    dict(type='TopdownAffine3D', input_size=codec['input_size']),
     dict(type='mmdet.YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
