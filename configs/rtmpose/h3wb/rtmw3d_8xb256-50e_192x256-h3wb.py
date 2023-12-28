@@ -71,7 +71,7 @@ model = dict(
             'rtmposev1/cspnext-l_udp-aic-coco_210e-256x192-273b7631_20230130.pth'  # noqa: E501
         )),
     head=dict(
-        type='RTMCCHead',
+        type='RTMCC3DHead',
         in_channels=1024,
         out_channels=133,
         input_size=codec['input_size'],
