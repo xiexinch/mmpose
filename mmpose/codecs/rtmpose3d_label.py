@@ -37,7 +37,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
         self.simcc_split_ratio = simcc_split_ratio
         self.label_smooth_weight = label_smooth_weight
         self.normalize = normalize
-        if isinstance(root_index):
+        if isinstance(root_index, int):
             root_index = [root_index]
         self.root_index = root_index
 

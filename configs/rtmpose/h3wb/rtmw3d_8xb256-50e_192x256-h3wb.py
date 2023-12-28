@@ -43,7 +43,7 @@ codec = dict(
     sigma=(4.9, 5.66, 5.66),
     simcc_split_ratio=2.0,
     normalize=False,
-    use_dark=False)
+    root_index=[12, 13])
 
 # model settings
 model = dict(
@@ -110,7 +110,7 @@ train_pipeline = [
     dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
+    dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='mmdet.YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
@@ -133,7 +133,7 @@ train_pipeline = [
 val_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
+    dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='PackPoseInputs')
 ]
 
@@ -147,7 +147,7 @@ train_pipeline_stage2 = [
         shift_factor=0.,
         scale_factor=[0.75, 1.25],
         rotate_factor=60),
-    dict(type='TopdownAffine3D', input_size=codec['input_size']),
+    dict(type='TopdownAffine', input_size=codec['input_size']),
     dict(type='mmdet.YOLOXHSVRandomAug'),
     dict(
         type='Albumentation',
@@ -170,7 +170,7 @@ train_pipeline_stage2 = [
 
 # h3wb dataset
 h3wb_dataset = dict(
-    type='H3WBDataset',
+    type='H36MWholeBodyDataset',
     ann_file='annotation_body3d/h3wb_train.npz',
     seq_len=1,
     causal=True,
@@ -194,7 +194,7 @@ val_dataloader = dict(
     drop_last=False,
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
-        type='H3WBDataset',
+        type='H36MWholeBodyDataset',
         ann_file='annotation_body3d/h3wb_train.npz',
         seq_len=1,
         causal=True,
