@@ -242,16 +242,17 @@ class UBody3dDataset(BaseMocapDataset):
 
             instance_list.append(instance_info)
 
-        for img_id in self.ann_data.getImgIds():
-            img = self.ann_data.loadImgs(img_id)[0]
-            img.update({
-                'img_id':
-                img_id,
-                'img_path':
-                osp.join(self.data_prefix['img'], img['file_name']),
-            })
-            image_list.append(img)
-
+        if self.data_mode == 'bottomup':
+            for img_id in self.ann_data.getImgIds():
+                img = self.ann_data.loadImgs(img_id)[0]
+                img.update({
+                    'img_id':
+                    img_id,
+                    'img_path':
+                    osp.join(self.data_prefix['img'], img['file_name']),
+                })
+                image_list.append(img)
+        del self.ann_data
         return instance_list, image_list
 
     def load_data_list(self) -> List[dict]:
