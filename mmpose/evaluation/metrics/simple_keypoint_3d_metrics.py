@@ -46,7 +46,10 @@ class SimpleMPJPE(BaseMetric):
                  mode: str = 'mpjpe',
                  collect_device: str = 'cpu',
                  prefix: Optional[str] = None,
-                 skip_list: List[str] = []) -> None:
+                 skip_list: List[str] = [],
+                 pred_field: str = 'keypoints',
+                 gt_field: str = 'lifting_target',
+                 gt_mask_field: str = 'lifting_target_visible') -> None:
         super().__init__(collect_device=collect_device, prefix=prefix)
         allowed_modes = self.ALIGNMENT.keys()
         if mode not in allowed_modes:
@@ -55,6 +58,9 @@ class SimpleMPJPE(BaseMetric):
 
         self.mode = mode
         self.skip_list = skip_list
+        self.pred_field = pred_field
+        self.gt_field = gt_field
+        self.gt_mask_field = gt_mask_field
 
     def process(self, data_batch: Sequence[dict],
                 data_samples: Sequence[dict]) -> None:
@@ -70,15 +76,15 @@ class SimpleMPJPE(BaseMetric):
         """
         for data_sample in data_samples:
             # predicted keypoints coordinates, [T, K, D]
-            pred_coords = data_sample['pred_instances']['keypoints']
+            pred_coords = data_sample['pred_instances'][self.pred_field]
             if pred_coords.ndim == 4:
                 pred_coords = np.squeeze(pred_coords, axis=0)
             # ground truth data_info
             gt = data_sample['gt_instances']
             # ground truth keypoints coordinates, [T, K, D]
-            gt_coords = gt['lifting_target']
+            gt_coords = gt[self.gt_field]
             # ground truth keypoints_visible, [T, K, 1]
-            mask = gt['lifting_target_visible'].astype(bool).reshape(
+            mask = gt[self.gt_mask_field].astype(bool).reshape(
                 gt_coords.shape[0], -1)
 
             result = {

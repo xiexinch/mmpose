@@ -19,7 +19,15 @@ class RTMPose3DLabel(BaseKeypointCodec):
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
         keypoint_y_labels='keypoint_y_labels',
-        keypoint_z_labels='keypoint_z_labels')
+        keypoint_z_labels='keypoint_z_labels',
+        keypoint_weights='keypoint_weights')
+
+    instance_mapping_table = dict(
+        bboxes='bboxes',
+        keypoints_3d='keypoints_3d',
+        keypoints_3d_gt='keypoints_3d_gt',
+        keypoints_3d_visible='keypoints_3d_visible',
+    )
 
     def __init__(self,
                  input_size: tuple,
@@ -31,6 +39,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
                  z_max: float = None,
                  camera_param: dict = None,
                  test_mode: bool = False,
+                 num_keypoints: int = 17,
                  gt_field: str = 'keypoints_3d') -> None:
         super().__init__()
         self.input_size = input_size
@@ -75,7 +84,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
             }
 
         self.test_mode = test_mode
-
+        self.num_keypoints = num_keypoints
         self.z_max = z_max if z_max is not None else 1.7682814598083496
 
     def encode(self,
@@ -85,7 +94,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
                keypoints_visible: Optional[np.ndarray] = None) -> dict:
         """Encode keypoints to 3D labels."""
         keypoints_z = transformed_keypoints[..., 2:3]
-        root_z = keypoints_z[:, self.root_index].mean()
+        root_z = np.array([keypoints_z[:, self.root_index].mean()])
         if not self.test_mode:
             keypoints_z = ((keypoints_z - root_z) / self.z_max + 1) * (
                 self.input_size[-1] / 2)
@@ -102,7 +111,7 @@ class RTMPose3DLabel(BaseKeypointCodec):
             encoded = dict(
                 keypoints_3d_gt=keypoints_3d,
                 keypoints_3d_visible=keypoints_visible)
-        if np.allclose(keypoints_3d, np.zeros((1, 17, 3))):
+        if keypoints_3d.sum() == 0:
             root_z = np.array([self.z_max])
         encoded['root_z'] = root_z
         return encoded

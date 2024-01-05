@@ -1,11 +1,11 @@
 _base_ = ['../../_base_/default_runtime.py']
 
 # runtime
-max_epochs = 270
+max_epochs = 50
 stage2_num_epochs = 30
 base_lr = 4e-3
 
-train_cfg = dict(max_epochs=max_epochs, val_interval=10)
+train_cfg = dict(max_epochs=max_epochs, val_interval=1)
 randomness = dict(seed=21)
 
 # optimizer
@@ -43,7 +43,9 @@ codec = dict(
     sigma=(4.9, 5.66, 5.66),
     simcc_split_ratio=2.0,
     normalize=False,
-    root_index=[12, 13])
+    root_index=[12, 13],
+    num_keypoints=133,
+)
 
 # model settings
 model = dict(
@@ -54,13 +56,11 @@ model = dict(
         std=[58.395, 57.12, 57.375],
         bgr_to_rgb=True),
     backbone=dict(
-        _scope_='mmdet',
         type='CSPNeXt',
         arch='P5',
         expand_ratio=0.5,
         deepen_factor=1.,
         widen_factor=1.,
-        out_indices=(4, ),
         channel_attention=True,
         norm_cfg=dict(type='SyncBN'),
         act_cfg=dict(type='SiLU'),
@@ -68,8 +68,20 @@ model = dict(
             type='Pretrained',
             prefix='backbone.',
             checkpoint='https://download.openmmlab.com/mmpose/v1/projects/'
-            'rtmposev1/cspnext-l_udp-aic-coco_210e-256x192-273b7631_20230130.pth'  # noqa: E501
+            'rtmposev1/rtmpose-l_simcc-ucoco_dw-ucoco_270e-256x192-4d6dfc62_20230728.pth'  # noqa
         )),
+    neck=dict(
+        type='CSPNeXtPAFPN',
+        in_channels=[256, 512, 1024],
+        out_channels=None,
+        out_indices=(
+            1,
+            2,
+        ),
+        num_csp_blocks=2,
+        expand_ratio=0.5,
+        norm_cfg=dict(type='SyncBN'),
+        act_cfg=dict(type='SiLU', inplace=True)),
     head=dict(
         type='RTMCC3DHead',
         in_channels=1024,
@@ -101,8 +113,8 @@ backend_args = dict(backend='local')
 train_pipeline = [
     dict(type='LoadImage', backend_args=backend_args),
     dict(type='GetBBoxCenterScale'),
-    dict(type='RandomFlip', direction='horizontal'),
-    dict(type='RandomHalfBody'),
+    # dict(type='RandomFlip', direction='horizontal'),
+    # dict(type='RandomHalfBody'),
     dict(
         type='RandomBBoxTransform', scale_factor=[0.6, 1.4], rotate_factor=80),
     dict(type='TopdownAffine3D', input_size=codec['input_size']),
@@ -166,7 +178,7 @@ train_pipeline_stage2 = [
 # h3wb dataset
 h3wb_dataset = dict(
     type='H36MWholeBodyDataset',
-    ann_file='annotation_body3d/h3wb_train.npz',
+    ann_file='annotation_body3d/h3wb_train_bbox.npz',
     seq_len=1,
     causal=True,
     data_root='data/h36m/',
@@ -177,7 +189,7 @@ h3wb_dataset = dict(
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=128,
     num_workers=10,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
@@ -190,7 +202,7 @@ val_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=False, round_up=False),
     dataset=dict(
         type='H36MWholeBodyDataset',
-        ann_file='annotation_body3d/h3wb_train.npz',
+        ann_file='annotation_body3d/h3wb_train_bbox.npz',
         seq_len=1,
         causal=True,
         data_root='data/h36m/',

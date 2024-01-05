@@ -603,7 +603,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             show_kpt_idx=show_kpt_idx,
             axis_dist=axis_dist,
             axis_elev=axis_elev,
-            scores_2d=scores_2d)
+            scores_2d=scores_2d,
+            kpt_thr=kpt_thr)
 
         # merge visualization results
         if det_img_data is not None:
