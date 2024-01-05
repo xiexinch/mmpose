@@ -10,23 +10,14 @@ visualizer = dict(
 train_cfg = dict(max_epochs=200, val_interval=10)
 
 # optimizer
-optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='Adam', lr=1e-3),
-    clip_grad=dict(max_norm=0.1, norm_type=2))
+optim_wrapper = dict(optimizer=dict(type='Adam', lr=1e-3))
 
 # learning policy
 param_scheduler = [
-    dict(
-        type='PolyLR',
-        eta_min=0,
-        power=0.9,
-        begin=0,
-        end=100000,
-        by_epoch=False)
+    dict(type='StepLR', step_size=100000, gamma=0.96, end=80, by_epoch=False)
 ]
 
-auto_scale_lr = dict(base_batch_size=4096)
+auto_scale_lr = dict(base_batch_size=512)
 
 # hooks
 default_hooks = dict(
@@ -667,7 +658,7 @@ for scene in scenes:
 
 # data loaders
 train_dataloader = dict(
-    batch_size=512,
+    batch_size=64,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
