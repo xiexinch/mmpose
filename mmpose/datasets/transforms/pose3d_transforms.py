@@ -138,3 +138,55 @@ class RandomFlipAroundRoot(BaseTransform):
                 results['camera_param'].update(_camera_param)
 
         return results
+
+
+@TRANSFORMS.register_module()
+class RandomPerturb2DKeypoints(BaseTransform):
+
+    def __init__(self,
+                 pertur_prob: float = 0.5,
+                 max_perturbation: float = 10.0):
+        """Add random perturbation to the input keypoints.
+
+        Args:
+           pertur_prob (float): Probability of perturbation
+           max_perturbation (float): Maximum perturbation that can be added to
+               each keypoint
+        """
+        self.pertur_prob = pertur_prob
+        self.pertur_range = max_perturbation
+
+    def transform(self, results: dict) -> dict:
+
+        keypoints = results['keypoints']
+
+        prob = np.random.random()
+        if prob > self.pertur_prob:
+            return results
+
+        # Generate random perturbations for x and y coordinates
+        perturbations = np.random.uniform(-self.pertur_range,
+                                          self.pertur_range, keypoints.shape)
+        # Apply the perturbations to the keypoints
+        perturbed_keypoints = keypoints + perturbations
+        results['keypoints'] = perturbed_keypoints
+        return results
+
+
+@TRANSFORMS.register_module()
+class RandomDropTarget(BaseTransform):
+
+    def __init__(self, drop_rate: float = 0.1) -> None:
+        self.drop_rate = drop_rate
+
+    def transform(self, results: Dict) -> dict:
+
+        keypoints = results['keypoints']
+
+        # random select keypoints to drop
+        num_keypoints = keypoints.shape[0]
+        num_drop = int(num_keypoints * self.drop_rate)
+        drop_idx = np.random.choice(num_keypoints, num_drop, replace=False)
+        results['keypoint_weights'][drop_idx] = 0.0
+
+        return results
