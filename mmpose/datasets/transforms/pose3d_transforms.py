@@ -174,7 +174,7 @@ class RandomPerturb2DKeypoints(BaseTransform):
 
 
 @TRANSFORMS.register_module()
-class RandomDropTarget(BaseTransform):
+class RandomDropInput(BaseTransform):
 
     def __init__(self, drop_rate: float = 0.1) -> None:
         self.drop_rate = drop_rate
@@ -187,6 +187,8 @@ class RandomDropTarget(BaseTransform):
         num_keypoints = keypoints.shape[0]
         num_drop = int(num_keypoints * self.drop_rate)
         drop_idx = np.random.choice(num_keypoints, num_drop, replace=False)
-        results['keypoint_weights'][drop_idx] = 0.0
+
+        results['lifting_target_visible'][drop_idx] = 0.0
+        results['keypoints_visible'][drop_idx] = 0.0
 
         return results

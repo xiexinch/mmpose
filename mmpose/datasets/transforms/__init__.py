@@ -12,7 +12,7 @@ from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
 from .loading import LoadImage
 from .mix_img_transforms import Mosaic, YOLOXMixUp
-from .pose3d_transforms import (RandomDropTarget, RandomFlipAroundRoot,
+from .pose3d_transforms import (RandomDropInput, RandomFlipAroundRoot,
                                 RandomPerturb2DKeypoints)
 from .topdown_transforms import TopdownAffine
 
@@ -25,5 +25,5 @@ __all__ = [
     'FilterAnnotations', 'YOLOXHSVRandomAug', 'YOLOXMixUp', 'Mosaic',
     'BottomupRandomCrop', 'BottomupRandomChoiceResize', 'HandRandomFlip',
     'SingleHandConverter', 'KeypointSelector', 'RandomPerturb2DKeypoints',
-    'RandomDropTarget'
+    'RandomDropInput'
 ]
