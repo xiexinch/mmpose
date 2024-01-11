@@ -416,5 +416,5 @@ class H3WBDataset(BaseMocapDataset):
                                 image_list.append(img_info)
 
                         instance_id += 1
-
+        del self.ann_data
         return instance_list, image_list

@@ -34,7 +34,6 @@ class MPII3DHPWBDataset(BaseMocapDataset):
         indices = indices[start:end]
 
         for i in indices:
-            print(i)
             ann = self.ann_data[i]
             num_keypoints = self.metainfo['num_keypoints']
 
@@ -52,7 +51,6 @@ class MPII3DHPWBDataset(BaseMocapDataset):
                 'keypoints': kpts_2d,
                 'keypoints_3d': kpts_3d,
                 'keypoints_visible': keypoints_visible,
-                # 'factors': np.zeros((kpts_3d.shape[0], ), dtype=np.float32),
                 'id': i,
                 'category_id': 1,
                 'iscrowd': 0,
@@ -61,5 +59,5 @@ class MPII3DHPWBDataset(BaseMocapDataset):
                 'camera_param': camera_param
             }
             instance_list.append(instance_info)
-        print(len(instance_list), subset_size)
+        del self.ann_data
         return instance_list, []

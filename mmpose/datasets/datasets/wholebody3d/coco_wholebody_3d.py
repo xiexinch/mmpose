@@ -61,5 +61,5 @@ class COCOWholebody3D(BaseMocapDataset):
                 'camera_param': camera_param
             }
             instance_list.append(instance_info)
-
+        del self.ann_data
         return instance_list, image_list

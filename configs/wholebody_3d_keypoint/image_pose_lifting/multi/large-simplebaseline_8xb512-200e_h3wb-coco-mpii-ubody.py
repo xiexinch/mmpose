@@ -7,14 +7,26 @@ visualizer = dict(
     type='Pose3dLocalVisualizer', vis_backends=vis_backends, name='visualizer')
 
 # runtime
-train_cfg = dict(max_epochs=200, val_interval=10)
+train_cfg = dict(max_epochs=210, val_interval=10)
 
 # optimizer
-optim_wrapper = dict(optimizer=dict(type='Adam', lr=1e-3))
+optim_wrapper = dict(optimizer=dict(
+    type='Adam',
+    lr=5e-4,
+))
 
 # learning policy
 param_scheduler = [
-    dict(type='StepLR', step_size=100000, gamma=0.96, end=80, by_epoch=False)
+    dict(
+        type='LinearLR', begin=0, end=500, start_factor=0.001,
+        by_epoch=False),  # warm-up
+    dict(
+        type='MultiStepLR',
+        begin=0,
+        end=200,
+        milestones=[170, 200],
+        gamma=0.1,
+        by_epoch=True)
 ]
 
 auto_scale_lr = dict(base_batch_size=512)
