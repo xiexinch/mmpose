@@ -238,19 +238,22 @@ class RandomPerturbScoreBalance(BaseTransform):
 @TRANSFORMS.register_module()
 class RandomDropInput(BaseTransform):
 
-    def __init__(self, drop_rate: float = 0.1) -> None:
+    def __init__(self, prob: float = 0.5, drop_rate: float = 0.1):
+        self.prob = prob
         self.drop_rate = drop_rate
 
     def transform(self, results: Dict) -> dict:
+        if np.random.random() > self.prob:
+            return results
 
-        keypoints = results['keypoints']
+        keypoints_visible = results['keypoints_visible']
 
-        # random select keypoints to drop
-        num_keypoints = keypoints.shape[0]
-        num_drop = int(num_keypoints * self.drop_rate)
-        drop_idx = np.random.choice(num_keypoints, num_drop, replace=False)
+        mask_indices = np.random.choice(
+            keypoints_visible.shape[0],
+            int(keypoints_visible.shape[0] * self.drop_rate),
+            replace=False)
+        keypoints_visible[mask_indices] = 0.0
 
-        results['lifting_target_visible'][drop_idx] = 0.0
-        results['keypoints_visible'][drop_idx] = 0.0
-
+        results['keypoints_visible'] = keypoints_visible
+        results['lifting_target_visible'] = keypoints_visible
         return results
