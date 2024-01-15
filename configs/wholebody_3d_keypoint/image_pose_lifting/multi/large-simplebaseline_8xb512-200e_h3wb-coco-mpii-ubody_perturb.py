@@ -593,8 +593,12 @@ model = dict(
 
 # pipelines
 train_pipeline = [
+    dict(
+        type='RandomPerturb2DKeypoints',
+        body_indices=list(range(0, 23)),
+        hand_indices=list(range(91, 133)),
+        face_indices=list(range(23, 91))),
     dict(type='GenerateTarget', encoder=codec),
-    dict(type='RandomPerturb2DKeypoints'),
     dict(
         type='PackPoseInputs',
         meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',

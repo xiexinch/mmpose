@@ -145,6 +145,80 @@ class RandomPerturb2DKeypoints(BaseTransform):
 
     def __init__(self,
                  pertur_prob: float = 0.5,
+                 body_range: float = 10.0,
+                 face_range: float = 2.0,
+                 hand_range: float = 2.0,
+                 body_indices: list = None,
+                 hand_indices: list = None,
+                 face_indices: list = None):
+        """Add random perturbation to the input keypoints.
+
+        Args:
+           pertur_prob (float): Probability of perturbation
+           max_perturbation (float): Maximum perturbation that can be added to
+               each keypoint
+        """
+        self.pertur_prob = pertur_prob
+        self.body_range = body_range
+        self.face_range = face_range
+        self.hand_range = hand_range
+        self.body_indices = body_indices
+        self.hand_indices = hand_indices
+        self.face_indices = face_indices
+
+    def _random_pertubation(self, keypoints: np.ndarray, indices: list,
+                            pertur_range: float):
+        """Add random perturbation to the input keypoints.
+
+        Args:
+            keypoints (np.ndarray): keypoints to be perturbed
+            indices (list): indices of the keypoints to be perturbed
+            pertur_range (float): maximum perturbation that can be added to
+                each keypoint
+        """
+        keypoints = keypoints[indices]
+        # Generate random perturbations for x and y coordinates
+        perturbations = np.random.uniform(-pertur_range, pertur_range,
+                                          keypoints.shape)
+        # Apply the perturbations to the keypoints
+        keypoints = keypoints + perturbations
+        return keypoints
+
+    def transform(self, results: dict) -> dict:
+
+        keypoints = results['keypoints']
+
+        prob = np.random.random()
+        if prob > self.pertur_prob:
+            return results
+
+        perturbed_keypoints = keypoints.copy()
+
+        if self.body_indices is not None:
+            body_keypoints = self._random_pertubation(
+                keypoints[self.body_indices], self.body_indices,
+                self.body_range)
+            perturbed_keypoints[self.body_indices] = body_keypoints
+        if self.hand_indices is not None:
+            hand_keypoints = self._random_pertubation(
+                keypoints[self.hand_indices], self.hand_indices,
+                self.hand_range)
+            perturbed_keypoints[self.hand_indices] = hand_keypoints
+        if self.face_indices is not None:
+            face_keypoints = self._random_pertubation(
+                keypoints[self.face_indices], self.face_indices,
+                self.face_range)
+            perturbed_keypoints[self.face_indices] = face_keypoints
+
+        results['keypoints'] = perturbed_keypoints.astype(np.float32)
+        return results
+
+
+@TRANSFORMS.register_module()
+class RandomPerturbScoreBalance(BaseTransform):
+
+    def __init__(self,
+                 pertur_prob: float = 0.5,
                  max_perturbation: float = 10.0):
         """Add random perturbation to the input keypoints.
 
@@ -158,19 +232,7 @@ class RandomPerturb2DKeypoints(BaseTransform):
 
     def transform(self, results: dict) -> dict:
 
-        keypoints = results['keypoints']
-
-        prob = np.random.random()
-        if prob > self.pertur_prob:
-            return results
-
-        # Generate random perturbations for x and y coordinates
-        perturbations = np.random.uniform(-self.pertur_range,
-                                          self.pertur_range, keypoints.shape)
-        # Apply the perturbations to the keypoints
-        perturbed_keypoints = keypoints + perturbations
-        results['keypoints'] = perturbed_keypoints
-        return results
+        pass
 
 
 @TRANSFORMS.register_module()
