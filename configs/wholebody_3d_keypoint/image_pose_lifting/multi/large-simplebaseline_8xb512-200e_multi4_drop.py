@@ -605,7 +605,7 @@ model = dict(
 
 # pipelines
 train_pipeline = [
-    dict(type='RandomDropInput'),
+    dict(type='RandomDropInput', drop_rate=0.3),
     dict(type='GenerateTarget', encoder=codec),
     dict(
         type='PackPoseInputs',
@@ -613,7 +613,14 @@ train_pipeline = [
                    'target_root', 'target_root_index', 'target_mean',
                    'target_std'))
 ]
-val_pipeline = train_pipeline
+val_pipeline = [
+    dict(type='GenerateTarget', encoder=codec),
+    dict(
+        type='PackPoseInputs',
+        meta_keys=('id', 'category_id', 'target_img_path', 'flip_indices',
+                   'target_root', 'target_root_index', 'target_mean',
+                   'target_std'))
+]
 
 # h3wb dataset
 h3wb_dataset = dict(
@@ -671,7 +678,7 @@ for scene in scenes:
 
 # data loaders
 train_dataloader = dict(
-    batch_size=64,
+    batch_size=512,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),

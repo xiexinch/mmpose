@@ -249,10 +249,10 @@ class RandomDropInput(BaseTransform):
         keypoints_visible = results['keypoints_visible']
 
         mask_indices = np.random.choice(
-            keypoints_visible.shape[0],
-            int(keypoints_visible.shape[0] * self.drop_rate),
+            keypoints_visible.shape[-1],
+            int(keypoints_visible.shape[-1] * self.drop_rate),
             replace=False)
-        keypoints_visible[mask_indices] = 0.0
+        keypoints_visible[:, mask_indices] = 0.0
 
         results['keypoints_visible'] = keypoints_visible
         results['lifting_target_visible'] = keypoints_visible
