@@ -176,7 +176,7 @@ class RandomPerturb2DKeypoints(BaseTransform):
             pertur_range (float): maximum perturbation that can be added to
                 each keypoint
         """
-        keypoints = keypoints[indices]
+        keypoints = keypoints[:, indices]
         # Generate random perturbations for x and y coordinates
         perturbations = np.random.uniform(-pertur_range, pertur_range,
                                           keypoints.shape)
@@ -195,20 +195,20 @@ class RandomPerturb2DKeypoints(BaseTransform):
         perturbed_keypoints = keypoints.copy()
 
         if self.body_indices is not None:
-            body_keypoints = self._random_pertubation(
-                keypoints[self.body_indices], self.body_indices,
-                self.body_range)
-            perturbed_keypoints[self.body_indices] = body_keypoints
+            body_keypoints = self._random_pertubation(keypoints,
+                                                      self.body_indices,
+                                                      self.body_range)
+            perturbed_keypoints[:, self.body_indices] = body_keypoints
         if self.hand_indices is not None:
-            hand_keypoints = self._random_pertubation(
-                keypoints[self.hand_indices], self.hand_indices,
-                self.hand_range)
-            perturbed_keypoints[self.hand_indices] = hand_keypoints
+            hand_keypoints = self._random_pertubation(keypoints,
+                                                      self.hand_indices,
+                                                      self.hand_range)
+            perturbed_keypoints[:, self.hand_indices] = hand_keypoints
         if self.face_indices is not None:
-            face_keypoints = self._random_pertubation(
-                keypoints[self.face_indices], self.face_indices,
-                self.face_range)
-            perturbed_keypoints[self.face_indices] = face_keypoints
+            face_keypoints = self._random_pertubation(keypoints,
+                                                      self.face_indices,
+                                                      self.face_range)
+            perturbed_keypoints[:, self.face_indices] = face_keypoints
 
         results['keypoints'] = perturbed_keypoints.astype(np.float32)
         return results
