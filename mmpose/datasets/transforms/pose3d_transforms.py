@@ -215,24 +215,75 @@ class RandomPerturb2DKeypoints(BaseTransform):
 
 
 @TRANSFORMS.register_module()
-class RandomPerturbScoreBalance(BaseTransform):
+class RandomPerturbScoreBalance(RandomPerturb2DKeypoints):
 
-    def __init__(self,
-                 pertur_prob: float = 0.5,
-                 max_perturbation: float = 10.0):
+    def _random_pertubation(self, keypoints: np.ndarray, indices: list,
+                            pertur_range: float):
         """Add random perturbation to the input keypoints.
 
         Args:
-           pertur_prob (float): Probability of perturbation
-           max_perturbation (float): Maximum perturbation that can be added to
-               each keypoint
+            keypoints (np.ndarray): keypoints to be perturbed
+            indices (list): indices of the keypoints to be perturbed
+            pertur_range (float): maximum perturbation that can be added to
+                each keypoint
         """
-        self.pertur_prob = pertur_prob
-        self.pertur_range = max_perturbation
+        keypoints = keypoints[:, indices]
+
+        # Generate random perturbations for x, y, z coordinates
+        perturbations = np.random.uniform(-pertur_range, pertur_range,
+                                          keypoints.shape)
+
+        # Apply the perturbations to the keypoints
+        new_posision = keypoints + perturbations
+
+        # Calculate distance between original position and new position
+        distance = np.linalg.norm(new_posision - keypoints, axis=1)
+        rates = distance / pertur_range
+
+        return keypoints, rates
 
     def transform(self, results: dict) -> dict:
+        prob = np.random.random()
+        if prob > self.pertur_prob:
+            return results
 
-        pass
+        keypoints = results['keypoints']
+        perturbed_keypoints = keypoints.copy()
+        keypoints_visible = results['keypoints_visible'].copy()
+
+        if self.body_indices is not None:
+            body_keypoints, rates = self._random_pertubation(
+                keypoints, self.body_indices, self.body_range)
+            perturbed_keypoints[:, self.body_indices] = body_keypoints
+            keypoints_score = keypoints_visible[:, self.body_indices] - rates
+            if np.any(keypoints_score < 0):
+                keypoints_score = 0.0
+            keypoints_visible[:, self.body_indices] = keypoints_score
+
+        if self.hand_indices is not None:
+            hand_keypoints = self._random_pertubation(keypoints,
+                                                      self.hand_indices,
+                                                      self.hand_range)
+            perturbed_keypoints[:, self.hand_indices] = hand_keypoints
+            keypoints_score = keypoints_visible[:, self.hand_indices] - rates
+            if np.any(keypoints_score < 0):
+                keypoints_score = 0.0
+            keypoints_visible[:, self.hand_indices] = keypoints_score
+        if self.face_indices is not None:
+            face_keypoints = self._random_pertubation(keypoints,
+                                                      self.face_indices,
+                                                      self.face_range)
+            perturbed_keypoints[:, self.face_indices] = face_keypoints
+            keypoints_score = keypoints_visible[:, self.face_indices] - rates
+            if np.any(keypoints_score < 0):
+                keypoints_score = 0.0
+            keypoints_visible[:, self.face_indices] = keypoints_score
+
+        results['keypoints'] = perturbed_keypoints.astype(np.float32)
+        results['keypoints_visible'] = keypoints_visible.astype(np.float32)
+        results['lifting_target_visible'] = keypoints_visible.astype(
+            np.float32)
+        return results
 
 
 @TRANSFORMS.register_module()
