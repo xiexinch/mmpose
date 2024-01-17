@@ -237,7 +237,7 @@ class RandomPerturbScoreBalance(RandomPerturb2DKeypoints):
         new_posision = keypoints + perturbations
 
         # Calculate distance between original position and new position
-        distance = np.linalg.norm(new_posision - keypoints, axis=1)
+        distance = np.linalg.norm(new_posision - keypoints, axis=-1)
         rates = distance / pertur_range
 
         return keypoints, rates
@@ -255,28 +255,23 @@ class RandomPerturbScoreBalance(RandomPerturb2DKeypoints):
             body_keypoints, rates = self._random_pertubation(
                 keypoints, self.body_indices, self.body_range)
             perturbed_keypoints[:, self.body_indices] = body_keypoints
-            keypoints_score = keypoints_visible[:, self.body_indices] - rates
-            if np.any(keypoints_score < 0):
-                keypoints_score = 0.0
+            keypoints_score = 1 - rates
+            keypoints_score[keypoints_score < 0] = 0
             keypoints_visible[:, self.body_indices] = keypoints_score
 
         if self.hand_indices is not None:
-            hand_keypoints = self._random_pertubation(keypoints,
-                                                      self.hand_indices,
-                                                      self.hand_range)
+            hand_keypoints, rates = self._random_pertubation(
+                keypoints, self.hand_indices, self.hand_range)
             perturbed_keypoints[:, self.hand_indices] = hand_keypoints
-            keypoints_score = keypoints_visible[:, self.hand_indices] - rates
-            if np.any(keypoints_score < 0):
-                keypoints_score = 0.0
+            keypoints_score = 1 - rates
+            keypoints_score[keypoints_score < 0] = 0
             keypoints_visible[:, self.hand_indices] = keypoints_score
         if self.face_indices is not None:
-            face_keypoints = self._random_pertubation(keypoints,
-                                                      self.face_indices,
-                                                      self.face_range)
+            face_keypoints, rates = self._random_pertubation(
+                keypoints, self.face_indices, self.face_range)
             perturbed_keypoints[:, self.face_indices] = face_keypoints
-            keypoints_score = keypoints_visible[:, self.face_indices] - rates
-            if np.any(keypoints_score < 0):
-                keypoints_score = 0.0
+            keypoints_score = 1 - rates
+            keypoints_score[keypoints_score < 0] = 0
             keypoints_visible[:, self.face_indices] = keypoints_score
 
         results['keypoints'] = perturbed_keypoints.astype(np.float32)
