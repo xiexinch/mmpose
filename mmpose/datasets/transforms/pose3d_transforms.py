@@ -1,9 +1,10 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from copy import deepcopy
-from typing import Dict
+from typing import Dict, List, Optional
 
 import numpy as np
 from mmcv.transforms import BaseTransform
+from mmcv.transforms.utils import cache_randomness
 
 from mmpose.registry import TRANSFORMS
 from mmpose.structures.keypoint import flip_keypoints_custom_center
@@ -302,4 +303,124 @@ class RandomDropInput(BaseTransform):
 
         results['keypoints_visible'] = keypoints_visible
         results['lifting_target_visible'] = keypoints_visible
+        return results
+
+
+@TRANSFORMS.register_module()
+class RandomHalfBody3D(BaseTransform):
+    """Data augmentation with half-body transform that keeps only the upper or
+    lower body at random.
+
+    Required Keys:
+
+        - keypoints
+        - keypoints_visible
+        - upper_body_ids
+        - lower_body_ids
+
+    Modified Keys:
+
+        - keypoints
+        - keypoints_visible
+        - lifting_target_visible
+
+    Args:
+        min_total_keypoints (int): The minimum required number of total valid
+            keypoints of a person to apply half-body transform. Defaults to 8
+        min_half_keypoints (int): The minimum required number of valid
+            half-body keypoints of a person to apply half-body transform.
+            Defaults to 2
+        padding (float): The bbox padding scale that will be multilied to
+            `bbox_scale`. Defaults to 1.5
+        prob (float): The probability to apply half-body transform when the
+            keypoint number meets the requirement. Defaults to 0.3
+    """
+
+    def __init__(self,
+                 min_total_keypoints: int = 9,
+                 min_upper_keypoints: int = 2,
+                 min_lower_keypoints: int = 3,
+                 prob: float = 0.3,
+                 upper_prioritized_prob: float = 0.7) -> None:
+        super().__init__()
+        self.min_total_keypoints = min_total_keypoints
+        self.min_upper_keypoints = min_upper_keypoints
+        self.min_lower_keypoints = min_lower_keypoints
+        self.prob = prob
+        self.upper_prioritized_prob = upper_prioritized_prob
+
+    @cache_randomness
+    def _random_select_half_body(self, keypoints_visible: np.ndarray,
+                                 upper_body_ids: List[int],
+                                 lower_body_ids: List[int]
+                                 ) -> List[Optional[List[int]]]:
+        """Randomly determine whether applying half-body transform and get the
+        half-body keyponit indices of each instances.
+
+        Args:
+            keypoints_visible (np.ndarray, optional): The visibility of
+                keypoints in shape (N, K, 1) or (N, K, 2).
+            upper_body_ids (list): The list of upper body keypoint indices
+            lower_body_ids (list): The list of lower body keypoint indices
+
+        Returns:
+            list[list[int] | None]: The selected half-body keypoint indices
+            of each instance. ``None`` means not applying half-body transform.
+        """
+
+        if keypoints_visible.ndim == 3:
+            keypoints_visible = keypoints_visible[..., 0]
+
+        half_body_ids = []
+
+        for visible in keypoints_visible:
+            if visible.sum() < self.min_total_keypoints:
+                indices = None
+            elif np.random.rand() > self.prob:
+                indices = None
+            else:
+                upper_valid_ids = [i for i in upper_body_ids if visible[i] > 0]
+                lower_valid_ids = [i for i in lower_body_ids if visible[i] > 0]
+
+                num_upper = len(upper_valid_ids)
+                num_lower = len(lower_valid_ids)
+
+                prefer_upper = np.random.rand() < self.upper_prioritized_prob
+                if (num_upper < self.min_upper_keypoints
+                        and num_lower < self.min_lower_keypoints):
+                    indices = None
+                elif num_lower < self.min_lower_keypoints:
+                    indices = upper_valid_ids
+                elif num_upper < self.min_upper_keypoints:
+                    indices = lower_valid_ids
+                else:
+                    indices = (
+                        upper_valid_ids if prefer_upper else lower_valid_ids)
+
+            half_body_ids.append(indices)
+
+        return half_body_ids
+
+    def transform(self, results: Dict) -> Optional[dict]:
+        """The transform function of :class:`HalfBodyTransform`.
+
+        See ``transform()`` method of :class:`BaseTransform` for details.
+
+        Args:
+            results (dict): The result dict
+
+        Returns:
+            dict: The result dict.
+        """
+        half_body_ids = self._random_select_half_body(
+            keypoints_visible=results['keypoints_visible'],
+            upper_body_ids=results['upper_body_ids'],
+            lower_body_ids=results['lower_body_ids'])
+
+        for indices in half_body_ids:
+            if indices is None:
+                continue
+            results['keypoints_visible'][:, indices] = 0
+            results['lifting_target_visible'][:, indices] = 0
+
         return results
