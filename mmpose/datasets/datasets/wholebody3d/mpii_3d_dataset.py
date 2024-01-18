@@ -11,8 +11,7 @@ from mmpose.registry import DATASETS
 @DATASETS.register_module()
 class MPII3DWBDataset(BaseMocapDataset):
 
-    METAINFO: dict = dict(
-        from_file='configs/_base_/datasets/coco_wholebody.py')
+    METAINFO: dict = dict(from_file='configs/_base_/datasets/h3wb.py')
 
     def _load_ann_file(self, ann_file: str) -> dict:
         with get_local_path(ann_file) as local_path:
