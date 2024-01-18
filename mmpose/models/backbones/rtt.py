@@ -1,53 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import torch
 import torch.nn as nn
-from mmengine.utils import digit_version
-from torch import Tensor
 
+from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
 from mmpose.registry import MODELS
-from .base_backbone import BaseBackbone
-
-
-class KeypointPostionEncoder(nn.Module):
-
-    def __init__(self, num_keypoints, num_channels):
-        super().__init__()
-        self.num_keypoints = num_keypoints
-        self.num_channels = num_channels
-        self.embeding = nn.Linear(num_keypoints * 2, num_channels)
-
-    def forward(self, x):
-        return self.embeding(x)
-
-
-@MODELS.register_module()
-class RTT(BaseBackbone):
-
-    def __init__(self,
-                 num_keypoints: int,
-                 embed_dims: int,
-                 num_layers: int = 2):
-        super().__init__()
-
-        self.num_keypoints = num_keypoints
-        self.embed_dims = embed_dims
-        self.num_layers = num_layers
-
-        self.keypoint_encoder = KeypointPostionEncoder(num_keypoints,
-                                                       embed_dims)
-
-        self.layers = nn.ModuleList([
-            nn.TransformerEncoderLayer(d_model=embed_dims, nhead=8)
-            for _ in range(num_layers)
-        ])
-
-    def forward(self, x):
-        if x.dim() == 3:
-            x = x.squeeze(-1)
-        x = self.keypoint_encoder(x)
-        for layer in self.layers:
-            x = layer(x)
-        return tuple([x.unsqueeze(-1)])
+from mmpose.utils.typing import ConfigType
 
 
 class lifter_res_block(nn.Module):
@@ -87,74 +43,51 @@ class LargeSimpleBaseline(nn.Module):
         return tuple([x.unsqueeze(-1)])
 
 
-class ChannelAttention(nn.Module):
-    """Channel attention Module.
-
-    Args:
-        channels (int): The input (and output) channels of the attention layer.
-        init_cfg (dict or list[dict], optional): Initialization config dict.
-            Defaults to None
-    """
-
-    def __init__(self, channels: int) -> None:
-        super().__init__()
-        self.global_avgpool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Linear(1, channels, bias=True)
-
-        if digit_version(torch.__version__) < (1, 7, 0):
-            self.act = nn.Hardsigmoid()
-        else:
-            self.act = nn.Hardsigmoid(inplace=True)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """Forward function for ChannelAttention."""
-        with torch.cuda.amp.autocast(enabled=False):
-            out = self.global_avgpool(x)
-        out = self.fc(out)
-        out = self.act(out)
-        return x * out
-
-
-class LifterResBlock(nn.Module):
-
-    def __init__(self, channels: int = 1024, num_layers: int = 2):
-        super().__init__()
-
-        self.layers = nn.ModuleList(
-            [nn.Linear(channels, channels) for _ in range(num_layers)])
-
-        self.ca = ChannelAttention(channels)
-
-    def forward(self, x):
-        inp = x
-        for layer in self.layers:
-            x = nn.LeakyReLU()(layer(x))
-        x = self.ca(x) + inp
-        return x
-
-
 @MODELS.register_module()
-class AttnLinearNet(nn.Module):
+class L2(nn.Module):
 
     def __init__(self,
-                 in_channels: int = 17 * 2,
+                 in_channels=17 * 2,
                  channels=1024,
-                 num_linears: int = 2,
-                 num_res_blocks: int = 2):
-        super().__init__()
+                 gau_cfg: ConfigType = dict(
+                     hidden_dims=512,
+                     s=128,
+                     expansion_factor=2,
+                     dropout_rate=0.,
+                     drop_path=0.,
+                     act_fn='ReLU',
+                     use_rel_bias=False,
+                     pos_enc=False)):
+        super(L2, self).__init__()
+
         self.upscale = nn.Linear(in_channels, channels)
-        self.res_layers = nn.ModuleList([
-            LifterResBlock(channels=channels, num_layers=num_linears)
-            for _ in range(num_res_blocks)
-        ])
+        self.res_1 = lifter_res_block(hidden=channels)
+        self.leaky_relu = nn.LeakyReLU()
+        self.mlp = nn.Sequential(
+            ScaleNorm(channels),
+            nn.Linear(channels, gau_cfg['hidden_dims'], bias=False))
 
-        self.act = nn.LeakyReLU()
+        self.mlp2 = nn.Sequential(
+            ScaleNorm(gau_cfg['hidden_dims']),
+            nn.Linear(
+                gau_cfg['hidden_dims'], gau_cfg['hidden_dims'], bias=False))
 
-    def forward(self, x: Tensor):
-        if x.dim() == 3:
-            x = x.squeeze(-1)
+        self.gau = RTMCCBlock(
+            channels,
+            gau_cfg['hidden_dims'],
+            gau_cfg['hidden_dims'],
+            s=gau_cfg['s'],
+            expansion_factor=gau_cfg['expansion_factor'],
+            dropout_rate=gau_cfg['dropout_rate'],
+            attn_type='self-attn',
+            use_rel_bias=gau_cfg['use_rel_bias'],
+            pos_enc=gau_cfg['pos_enc'])
+
+    def forward(self, x):
+        x = x.unsqueeze(1)
         x = self.upscale(x)
-        for layer in self.res_layers:
-            x = self.act(layer(x))
-
-        return tuple([x.unsqueeze(-1)])
+        x = self.leaky_relu(self.res_1(x))
+        x = self.mlp(x)
+        x = self.mlp2(x)
+        x = self.gau(x)
+        return tuple([x.reshape(x.shape[0], -1, 1)])
