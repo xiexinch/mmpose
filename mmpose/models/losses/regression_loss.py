@@ -537,6 +537,7 @@ class MSELoss(nn.Module):
         self.criterion = F.mse_loss
         self.use_target_weight = use_target_weight
         self.loss_weight = loss_weight
+        self._loss_name = 'mse_loss'
 
     def forward(self, output, target, target_weight=None, **kwargs):
         """Forward function.
@@ -560,6 +561,20 @@ class MSELoss(nn.Module):
             loss = self.criterion(output, target)
 
         return loss * self.loss_weight
+
+    @property
+    def loss_name(self):
+        """Loss Name.
+
+        This function must be implemented and will return the name of this
+        loss function. This name will be used to combine different loss items
+        by simple sum operation. In addition, if you want this loss item to be
+        included into the backward graph, `loss_` must be the prefix of the
+        name.
+        Returns:
+            str: The name of this loss item.
+        """
+        return self._loss_name
 
 
 @MODELS.register_module()
