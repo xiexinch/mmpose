@@ -48,7 +48,13 @@ class TemporalRegressionHead(BaseHead):
 
         self.in_channels = in_channels
         self.num_joints = num_joints
-        self.loss_module = MODELS.build(loss)
+        if isinstance(loss, dict):
+            self.loss_module = [MODELS.build(loss)]
+        elif isinstance(loss, (tuple, list)):
+            self.loss_module = [MODELS.build(loss_) for loss_ in loss]
+        else:
+            raise TypeError(
+                f'loss must be a dict or a sequence, but got {type(loss)}')
         if decoder is not None:
             self.decoder = KEYPOINT_CODECS.build(decoder)
         else:
@@ -126,10 +132,10 @@ class TemporalRegressionHead(BaseHead):
 
         # calculate losses
         losses = dict()
-        loss = self.loss_module(pred_outputs, lifting_target_label,
-                                lifting_target_weight.unsqueeze(-1))
-
-        losses.update(loss_pose3d=loss)
+        for loss_ in self.loss_module:
+            loss = loss_(pred_outputs, lifting_target_label,
+                         lifting_target_weight.unsqueeze(-1))
+            losses[loss_.loss_name] = loss
 
         # calculate accuracy
         mpjpe_err = keypoint_mpjpe(
