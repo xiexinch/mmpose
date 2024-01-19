@@ -62,15 +62,16 @@ class L2(nn.Module):
 
         self.upscale = nn.Linear(in_channels, channels)
         self.res_1 = lifter_res_block(hidden=channels)
-        self.leaky_relu = nn.LeakyReLU()
         self.mlp = nn.Sequential(
+            nn.Linear(channels, gau_cfg['hidden_dims'], bias=False),
             ScaleNorm(channels),
-            nn.Linear(channels, gau_cfg['hidden_dims'], bias=False))
+        )
 
         self.mlp2 = nn.Sequential(
-            ScaleNorm(gau_cfg['hidden_dims']),
             nn.Linear(
-                gau_cfg['hidden_dims'], gau_cfg['hidden_dims'], bias=False))
+                gau_cfg['hidden_dims'], gau_cfg['hidden_dims'], bias=False),
+            ScaleNorm(gau_cfg['hidden_dims']),
+        )
 
         self.gau = RTMCCBlock(
             channels,
@@ -84,10 +85,11 @@ class L2(nn.Module):
             pos_enc=gau_cfg['pos_enc'])
 
     def forward(self, x):
-        x = x.unsqueeze(1)
+        if x.ndim == 3:
+            x = x.reshape(x.shape[0], 1, -1)
         x = self.upscale(x)
-        x = self.leaky_relu(self.res_1(x))
-        x = self.mlp(x)
-        x = self.mlp2(x)
-        x = self.gau(x)
+        x1 = nn.LeakyReLU()(self.res_1(x))
+        x2 = x1 + nn.LeakyReLU()(self.mlp(x1))
+        x3 = x2 + nn.LeakyReLU()(self.mlp2(x2))
+        x = self.gau(x3)
         return tuple([x.reshape(x.shape[0], -1, 1)])

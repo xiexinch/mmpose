@@ -538,7 +538,7 @@ class MSELoss(nn.Module):
         self.use_target_weight = use_target_weight
         self.loss_weight = loss_weight
 
-    def forward(self, output, target, target_weight=None):
+    def forward(self, output, target, target_weight=None, **kwargs):
         """Forward function.
 
         Note:

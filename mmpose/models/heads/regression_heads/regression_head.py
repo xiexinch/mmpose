@@ -52,7 +52,13 @@ class RegressionHead(BaseHead):
 
         self.in_channels = in_channels
         self.num_joints = num_joints
-        self.loss_module = MODELS.build(loss)
+        if isinstance(loss, dict):
+            self.loss_module = [MODELS.build(loss)]
+        elif isinstance(loss, (tuple, list)):
+            self.loss_module = [MODELS.build(loss_) for loss_ in loss]
+        else:
+            raise TypeError(
+                f'loss must be a dict or a sequence, but got {type(loss)}')
         if decoder is not None:
             self.decoder = KEYPOINT_CODECS.build(decoder)
         else:
@@ -122,10 +128,11 @@ class RegressionHead(BaseHead):
 
         # calculate losses
         losses = dict()
-        loss = self.loss_module(pred_outputs, keypoint_labels,
-                                keypoint_weights.unsqueeze(-1))
-
-        losses.update(loss_kpt=loss)
+        for loss_ in self.loss_module:
+            loss = loss_(pred_outputs, keypoint_labels,
+                         keypoint_weights.unsqueeze(-1),
+                         batch_data_samples[0].metainfo)
+            losses[loss_.loss_name] = loss
 
         # calculate accuracy
         _, avg_acc, _ = keypoint_pck_accuracy(
