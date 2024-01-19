@@ -12,7 +12,7 @@ from .regression_loss import (BoneLoss, L1Loss, MPJPELoss,
                               MPJPEVelocityJointLoss, MSELoss, OKSLoss,
                               RLELoss, SemiSupervisionLoss, SmoothL1Loss,
                               SoftWeightSmoothL1Loss, SoftWingLoss, WingLoss)
-from .vector_loss import VectorSimilarityLoss
+from .vector_loss import FaceNurbsLoss, VectorSimilarityLoss
 
 __all__ = [
     'KeypointMSELoss', 'KeypointOHKMMSELoss', 'SmoothL1Loss', 'WingLoss',
@@ -21,5 +21,5 @@ __all__ = [
     'KLDiscretLoss', 'MultipleLossWrapper', 'JSDiscretLoss', 'CombinedLoss',
     'AssociativeEmbeddingLoss', 'SoftWeightSmoothL1Loss',
     'MPJPEVelocityJointLoss', 'FeaLoss', 'KDLoss', 'OKSLoss', 'IoULoss',
-    'VariFocalLoss', 'MLECCLoss', 'VectorSimilarityLoss'
+    'VariFocalLoss', 'MLECCLoss', 'VectorSimilarityLoss', 'FaceNurbsLoss'
 ]
