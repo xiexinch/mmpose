@@ -130,8 +130,7 @@ class RegressionHead(BaseHead):
         losses = dict()
         for loss_ in self.loss_module:
             loss = loss_(pred_outputs, keypoint_labels,
-                         keypoint_weights.unsqueeze(-1),
-                         batch_data_samples[0].metainfo)
+                         keypoint_weights.unsqueeze(-1))
             losses[loss_.loss_name] = loss
 
         # calculate accuracy
