@@ -14,10 +14,12 @@ class VectorSimilarityLoss(nn.Module):
     def __init__(self,
                  anchor_indices: List,
                  kpts_indices: List,
+                 loss_weight=1.,
                  loss_name: str = 'vs_loss'):
         super().__init__()
         self.anchor_indices = anchor_indices
         self.kpts_indices = kpts_indices
+        self.loss_weight = loss_weight
         self._loss_name = loss_name
 
     def forward(self,
@@ -46,7 +48,7 @@ class VectorSimilarityLoss(nn.Module):
         if target_weights is not None:
             loss = loss * target_weights
         print(loss.shape)
-        loss = loss.mean()
+        loss = loss.mean() * self.loss_weight
         return loss
 
     @property
