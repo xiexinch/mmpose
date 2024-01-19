@@ -134,7 +134,7 @@ class TemporalRegressionHead(BaseHead):
         losses = dict()
         for loss_ in self.loss_module:
             loss = loss_(pred_outputs, lifting_target_label,
-                         lifting_target_weight.unsqueeze(-1))
+                         lifting_target_weight)
             losses[loss_.loss_name] = loss
 
         # calculate accuracy

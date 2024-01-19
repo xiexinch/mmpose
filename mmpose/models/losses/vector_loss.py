@@ -34,10 +34,10 @@ class VectorSimilarityLoss(nn.Module):
         label_anchors, label_kpts = label[anchor_indices], label[kpts_indices]
 
         num_anchors, num_kpts = len(anchor_indices), len(kpts_indices)
-        pred_anchors = pred_anchors.repeat_interleave(num_kpts, dim=0)
-        pred_kpts = pred_kpts.repeat_interleave(num_anchors, dim=0)
-        label_anchors = label_anchors.repeat_interleave(num_kpts, dim=0)
-        label_kpts = label_kpts.repeat_interleave(num_anchors, dim=0)
+        pred_anchors = pred_anchors.repeat_interleave(num_kpts, dim=1)
+        pred_kpts = pred_kpts.repeat_interleave(num_anchors, dim=1)
+        label_anchors = label_anchors.repeat_interleave(num_kpts, dim=1)
+        label_kpts = label_kpts.repeat_interleave(num_anchors, dim=1)
 
         pred_vecs = pred_kpts - pred_anchors
         label_vecs = label_kpts - label_anchors
@@ -46,8 +46,10 @@ class VectorSimilarityLoss(nn.Module):
         cosine_similarity = F.cosine_similarity(pred_vecs, label_vecs, dim=-1)
         loss = 1 - cosine_similarity
         if target_weights is not None:
+            target_weights = target_weights[kpts_indices]
+            target_weights = target_weights.repeat_interleave(
+                num_anchors, dim=1)
             loss = loss * target_weights
-        print(loss.shape)
         loss = loss.mean() * self.loss_weight
         return loss
 
