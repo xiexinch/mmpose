@@ -75,6 +75,7 @@ class VectorSimilarityLoss(nn.Module):
 class FaceNurbsLoss(nn.Module):
 
     def __init__(self,
+                 face_indices: List,
                  num_joints: int = 68,
                  curve_p: int = 2,
                  curve_q: int = 3,
@@ -84,7 +85,9 @@ class FaceNurbsLoss(nn.Module):
                  loss_weight: float = 1.0,
                  loss_name: str = 'face_nurbs_loss'):
         super().__init__()
+        assert len(face_indices) == num_joints
 
+        self.face_indices = face_indices
         self.num_joints = num_joints
         self.knot_vector_u = self.generate_uniform_knot_vector(
             num_joints, curve_p)
@@ -199,6 +202,9 @@ class FaceNurbsLoss(nn.Module):
         return iou
 
     def forward(self, pred, label, target_weight):
+
+        pred = pred[:, self.face_indices]
+        label = label[:, self.face_indices]
 
         pred_surface = self.nurbs_surface_batch(pred, self.knot_vector_u,
                                                 self.knot_vector_v,
