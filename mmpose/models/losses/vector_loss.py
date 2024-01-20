@@ -135,14 +135,16 @@ class FaceNurbsLoss(nn.Module):
                             p,
                             q,
                             resolution=100):
+        device = control_points.device
         batch_size, n, _ = control_points.shape
-        u_values = torch.linspace(0, 1, resolution)
-        v_values = torch.linspace(0, 1, resolution)
-        surface_points = torch.zeros(batch_size, resolution, resolution, 3)
+        u_values = torch.linspace(0, 1, resolution, device=device)
+        v_values = torch.linspace(0, 1, resolution, device=device)
+        surface_points = torch.zeros(
+            batch_size, resolution, resolution, 3, device=device)
 
         # 预计算基函数值
-        Nu = torch.zeros(n, resolution)
-        Nv = torch.zeros(n, resolution)
+        Nu = torch.zeros(n, resolution, device=device)
+        Nv = torch.zeros(n, resolution, device=device)
         for i in range(n):
             for j, u in enumerate(u_values):
                 Nu[i, j] = self.b_spline_basis(i, p, u, knot_vector_u)
