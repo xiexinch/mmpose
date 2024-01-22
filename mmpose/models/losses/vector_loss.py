@@ -88,6 +88,8 @@ class FaceNurbsLoss(nn.Module):
         self.iou_threshold = iou_threshold
         self.pca_n_components = pca_n_components
         self.loss_weight = loss_weight
+        self.Nu, self.Nv = self.pre_cal_uv_values(face_resolution)
+
         self._loss_name = loss_name
 
     # 定义B样条基函数
@@ -116,40 +118,46 @@ class FaceNurbsLoss(nn.Module):
         end_knots = [1] * (p + 1)
         return start_knots + internal_knots + end_knots
 
-    # 批量处理NURBS曲面
-    def nurbs_surface_batch(self,
-                            control_points,
-                            knot_vector_u,
-                            knot_vector_v,
-                            p,
-                            q,
-                            resolution=100):
-        device = control_points.device
-        batch_size, n, _ = control_points.shape
-        u_values = torch.linspace(0, 1, resolution, device=device)
-        v_values = torch.linspace(0, 1, resolution, device=device)
-        surface_points = torch.zeros(
-            batch_size, resolution, resolution, 3, device=device)
+    def pre_cal_uv_values(self, resolution):
+        u_values = torch.linspace(0, 1, resolution)
+        v_values = torch.linspace(0, 1, resolution)
 
         # 预计算基函数值
-        Nu = torch.zeros(n, resolution, device=device)
-        Nv = torch.zeros(n, resolution, device=device)
-        for i in range(n):
+        Nu = torch.zeros(self.num_joints, resolution)
+        Nv = torch.zeros(self.num_joints, resolution)
+        for i in range(self.num_joints):
             for j, u in enumerate(u_values):
-                Nu[i, j] = self.b_spline_basis(i, p, u, knot_vector_u)
+                Nu[i, j] = self.b_spline_basis(i, self.curve_p, u,
+                                               self.knot_vector_u)
             for j, v in enumerate(v_values):
-                Nv[i, j] = self.b_spline_basis(i, q, v, knot_vector_v)
+                Nv[i, j] = self.b_spline_basis(i, self.curve_q, v,
+                                               self.knot_vector_v)
+        Nu = Nu.unsqueeze(0).unsqueeze(-1)  # Shape: [1, n, resolution, 1]
+        Nv = Nv.unsqueeze(0).unsqueeze(-2)  # Shape: [1, n, 1, resolution]
+        return Nu, Nv
+
+    # 批量处理NURBS曲面
+    def nurbs_surface_batch(self, control_points, weights):
+        device = control_points.device
+        batch_size, n, _ = control_points.shape
+        surface_points = torch.zeros(
+            batch_size,
+            self.face_resolution,
+            self.face_resolution,
+            3,
+            device=device)
+
+        Nu, Nv = self.Nu.to(device), self.Nv.to(device)
+        W = weights.unsqueeze(-1).unsqueeze(-1)  # Shape: [batch_size, n, 1, 1]
 
         # 批量计算曲面点
-        for b in range(batch_size):
-            for i in range(n):
-                for j in range(n):
-                    temp = control_points[b, i].unsqueeze(0).unsqueeze(
-                        0) * Nu[i].unsqueeze(1).unsqueeze(
-                            -1) * Nv[j].unsqueeze(0).unsqueeze(-1)
-                    surface_points[b] += temp
+        for i in range(n):
+            for j in range(n):
+                temp = control_points[:, i, :].unsqueeze(-2).unsqueeze(
+                    -2) * Nu[:, i, :, :] * Nv[:, j, :, :] * W[:, i]
+                surface_points += temp
 
-        # 重塑为 [batch_size, 10000, 3]
+        # 重新整理surface_points的形状
         return surface_points.reshape(batch_size, -1, 3)
 
     def calculate_pca_similarity(self, surface1, surface2, n_components=3):
