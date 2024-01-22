@@ -129,8 +129,8 @@ class L3(nn.Module):
             pos_enc=gau_cfg['pos_enc'])
 
     def forward(self, x):
-        if x.dim() == 3:
-            x = x.squeeze(-1)
+        if x.ndim == 3:
+            x = x.reshape(x.shape[0], 1, -1)
         x = self.upscale(x)
         x = nn.LeakyReLU()(self.res_1(x))
         x = nn.LeakyReLU()(self.res_2(x))
