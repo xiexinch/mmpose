@@ -164,14 +164,15 @@ class FaceNurbsLoss(nn.Module):
         return surface_points.reshape(batch_size, -1, 3)
 
     def pca(self, data, n_components=3):
-        """手动实现的PCA."""
+        """手动实现的PCA，适用于二维数据."""
         # 数据中心化
         mean = torch.mean(data, 0)
         data_centered = data - mean
 
         # 计算协方差矩阵
-        cov_matrix = torch.matmul(data_centered.T, data_centered) / (
-            data_centered.shape[0] - 1)
+        cov_matrix = torch.matmul(
+            data_centered.transpose(0, 1), data_centered) / (
+                data_centered.shape[0] - 1)
 
         # 特征值分解
         eigenvalues, eigenvectors = torch.linalg.eigh(cov_matrix)
@@ -183,13 +184,23 @@ class FaceNurbsLoss(nn.Module):
 
     def calculate_pca_similarity(self, surface1, surface2, n_components=3):
         """使用手动PCA计算两个曲面的相似度."""
-        combined_data = torch.cat((surface1, surface2), dim=0)
+        num_samples, num_points, num_coordinates = surface1.shape
+
+        # 重塑数据以适应PCA
+        surface1_reshaped = surface1.reshape(num_samples,
+                                             num_points * num_coordinates)
+        surface2_reshaped = surface2.reshape(num_samples,
+                                             num_points * num_coordinates)
+
+        # 组合重塑后的数据
+        combined_data = torch.cat((surface1_reshaped, surface2_reshaped),
+                                  dim=0)
         principal_components = self.pca(
             combined_data, n_components=n_components)
 
         # 将数据投影到主成分上
-        pca_surface1 = torch.matmul(surface1, principal_components)
-        pca_surface2 = torch.matmul(surface2, principal_components)
+        pca_surface1 = torch.matmul(surface1_reshaped, principal_components)
+        pca_surface2 = torch.matmul(surface2_reshaped, principal_components)
 
         # 计算主成分之间的欧氏距离
         distance = torch.norm(pca_surface1.mean(0) - pca_surface2.mean(0))
@@ -225,3 +236,17 @@ class FaceNurbsLoss(nn.Module):
         loss = (pca_loss + iou_loss) * self.loss_weight
 
         return loss
+
+    @property
+    def loss_name(self):
+        """Loss Name.
+
+        This function must be implemented and will return the name of this
+        loss function. This name will be used to combine different loss items
+        by simple sum operation. In addition, if you want this loss item to be
+        included into the backward graph, `loss_` must be the prefix of the
+        name.
+        Returns:
+            str: The name of this loss item.
+        """
+        return self._loss_name
