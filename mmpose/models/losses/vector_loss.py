@@ -132,30 +132,33 @@ class FaceNurbsLoss(nn.Module):
             for j, v in enumerate(v_values):
                 Nv[i, j] = self.b_spline_basis(i, self.curve_q, v,
                                                self.knot_vector_v)
-        Nu = Nu.unsqueeze(0).unsqueeze(-1)  # Shape: [1, n, resolution, 1]
-        Nv = Nv.unsqueeze(0).unsqueeze(-2)  # Shape: [1, n, 1, resolution]
+
         return Nu, Nv
 
     # 批量处理NURBS曲面
     def nurbs_surface_batch(self, control_points, weights):
         device = control_points.device
         batch_size, n, _ = control_points.shape
-        surface_points = torch.zeros(
-            batch_size,
-            self.face_resolution,
-            self.face_resolution,
-            3,
-            device=device)
+        res = self.face_resolution
+        surface_points = torch.zeros(batch_size, res, res, 3, device=device)
 
         Nu, Nv = self.Nu.to(device), self.Nv.to(device)
-        W = weights.unsqueeze(-1).unsqueeze(-1)  # Shape: [batch_size, n, 1, 1]
 
-        # 批量计算曲面点
-        for i in range(n):
-            for j in range(n):
-                temp = control_points[:, i, :].unsqueeze(-2).unsqueeze(
-                    -2) * Nu[:, i, :, :] * Nv[:, j, :, :] * W[:, i]
-                surface_points += temp
+        # 扩展Nu和Nv以计算外积
+        Nu_ext = Nu.unsqueeze(2).unsqueeze(0)  # Shape: [1, n, resolution, 1]
+        Nv_ext = Nv.unsqueeze(1).unsqueeze(0)  # Shape: [1, n, 1, resolution]
+        # 计算Nu和Nv的外积，以形成完整的基函数张量
+        NuNv = Nu_ext * Nv_ext  # Shape: [1, n, resolution, resolution]
+        NuNv = NuNv.unsqueeze(-1)
+        # 调整控制点的形状以匹配基函数张量
+        control_points_ext = control_points.unsqueeze(2).unsqueeze(
+            3)  # Shape: [batch_size, n, 1, 1, 3]
+
+        # 执行张量乘法
+        # Shape: [batch_size, n, resolution, resolution, 3]
+        surface_contributions = NuNv * control_points_ext
+        # 对所有控制点进行求和
+        surface_points = surface_contributions.sum(1)
 
         # 重新整理surface_points的形状
         return surface_points.reshape(batch_size, -1, 3)
@@ -198,23 +201,17 @@ class FaceNurbsLoss(nn.Module):
         pred = pred[:, self.face_indices]
         label = label[:, self.face_indices]
 
-        pred_surface = self.nurbs_surface_batch(pred, self.knot_vector_u,
-                                                self.knot_vector_v,
-                                                self.curve_p, self.curve_q,
-                                                self.face_resolution)
-        label_surface = self.nurbs_surface_batch(label, self.knot_vector_u,
-                                                 self.knot_vector_v,
-                                                 self.curve_p, self.curve_q,
-                                                 self.face_resolution)
+        pred_surface = self.nurbs_surface_batch(pred, target_weight)
+        label_surface = self.nurbs_surface_batch(label, target_weight)
 
-        pca_loss = 1 - self.calculate_pca_similarity(
-            pred_surface, label_surface, self.pca_n_components)
+        pca_loss = self.calculate_pca_similarity(pred_surface, label_surface,
+                                                 self.pca_n_components)
         iou_loss = 1 - self.calculate_iou(pred_surface, label_surface,
                                           self.iou_threshold)
 
         loss = (pca_loss + iou_loss) * self.loss_weight
 
-        return loss
+        return loss * self.loss_weight
 
     @property
     def loss_name(self):
