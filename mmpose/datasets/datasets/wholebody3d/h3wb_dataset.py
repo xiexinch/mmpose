@@ -335,11 +335,16 @@ class H3WBDataset(BaseMocapDataset):
                     num_keypoints = keypoints_2d.shape[1]
 
                     camera_param = self._metadata[subject][cam]
+                    K = camera_param['K'][0]
+                    f = (K[0, 0], K[1, 1])
+                    c = (K[0, 2], K[1, 2])
                     camera_param = {
                         'K': camera_param['K'][0, :2, ...],
                         'R': camera_param['R'][0],
                         'T': camera_param['T'].reshape(3, 1),
-                        'Distortion': camera_param['Distortion'][0]
+                        'Distortion': camera_param['Distortion'][0],
+                        'f': f,
+                        'c': c
                     }
 
                     seq_step = 1

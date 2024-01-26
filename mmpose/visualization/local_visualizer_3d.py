@@ -86,7 +86,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                               axis_dist: float = 10.0,
                               axis_elev: float = 15.0,
                               show_kpt_idx: bool = False,
-                              scores_2d: Optional[np.ndarray] = None):
+                              scores_2d: Optional[np.ndarray] = None,
+                              root_idx: int = 0):
         """Draw keypoints and skeletons (optional) of GT or prediction.
 
         Args:
@@ -155,11 +156,14 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                                     keypoints_visible,
                                     fig_idx,
                                     show_kpt_idx,
-                                    title=None):
+                                    title=None,
+                                    root_idx: int = 0):
 
             for idx, (kpts, score, score_2d) in enumerate(
                     zip(keypoints, scores, scores_2d)):
-
+                if isinstance(root_idx, int):
+                    root_idx = [root_idx]
+                root = kpts[root_idx].mean(0)
                 valid = np.logical_and(score >= kpt_thr, score_2d >= kpt_thr,
                                        np.any(~np.isnan(kpts), axis=-1))
 
@@ -177,10 +181,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                 if title:
                     ax.set_title(f'{title} ({idx})')
                 ax.dist = axis_dist
-
-                x_c = np.mean(kpts_valid[:, 0]) if valid.any() else 0
-                y_c = np.mean(kpts_valid[:, 1]) if valid.any() else 0
-                z_c = np.mean(kpts_valid[:, 2]) if valid.any() else 0
+                x_c, y_c, z_c = root[0], root[1], root[2]
 
                 ax.set_xlim3d([x_c - axis_limit / 2, x_c + axis_limit / 2])
                 ax.set_ylim3d([y_c - axis_limit / 2, y_c + axis_limit / 2])

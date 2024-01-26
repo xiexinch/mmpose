@@ -1,6 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 from mmcv.transforms import BaseTransform
@@ -424,3 +424,119 @@ class RandomHalfBody3D(BaseTransform):
             results['lifting_target_visible'][:, indices] = 0
 
         return results
+
+
+class CoordCorrectionAndRandomRotate(BaseTransform):
+
+    def transform(self, results: Dict) -> Optional[dict]:
+        assert 'cam_param' in results
+        cam_param = results['cam_param']
+
+        assert 'R' in cam_param and 'T' in cam_param
+        R = cam_param['R'].reshape(3, 3)
+        T = cam_param['T'].reshape(3, )
+
+        keypoints_3d = results['keypoints_3d']
+        keypoints_global = np.dot(keypoints_3d - T, R.T.T)
+
+        root = keypoints_global[[11, 12]].mean(0)
+
+        # rotate to camera space
+        rot_x_90 = np.array([[1, 0, 0],
+                             [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
+                             [0, np.sin(np.pi / 2),
+                              np.cos(np.pi / 2)]])
+
+        keypoints_g2c = np.dot(keypoints_global - root, rot_x_90.T) + root
+        root_new = keypoints_g2c[[11, 12]].mean(0)
+        # random rotate around root
+        arc = np.random.random() * np.pi * 2
+        rot_y = np.array([[np.cos(arc), 0, np.sin(arc)], [0, 1, 0],
+                          [-np.sin(arc), 0, np.cos(arc)]])
+        keypoints_3d = np.dot(keypoints_g2c - root_new, rot_y.T) + root_new
+
+        # new 2d keypoints
+        f, c = np.array(cam_param['f']), np.array(cam_param['c'])
+        cam_ = {'f': f, 'c': c}
+        keypoints_2d = self.camera_to_image_coord([11, 12], keypoints_3d, cam_)
+
+        results['keypoints_3d'] = keypoints_3d
+        results['lifting_target'] = keypoints_3d
+        results['keypoints'] = keypoints_2d
+        return results
+
+    def camera_to_image_coord(self, root_index: int, kpts_3d_cam: np.ndarray,
+                              camera_param: Dict
+                              ) -> Tuple[np.ndarray, np.ndarray]:
+        """Project keypoints from camera space to image space and calculate
+        factor.
+
+        Args:
+            root_index (int): Index for root keypoint.
+            kpts_3d_cam (np.ndarray): Keypoint coordinates in camera space in
+                shape (N, K, D).
+            camera_param (dict): Parameters for the camera.
+
+        Returns:
+            tuple:
+            - kpts_3d_image (np.ndarray): Keypoint coordinates in image space
+                in shape (N, K, D).
+            - factor (np.ndarray): The scaling factor that maps keypoints from
+                image space to camera space in shape (N, ).
+        """
+        if isinstance(root_index, int):
+            root_index = [root_index]
+        root = kpts_3d_cam[..., root_index, :].mean(1)
+        tl_kpt = root.copy()
+        tl_kpt[..., :2] -= 1.0
+        br_kpt = root.copy()
+        br_kpt[..., :2] += 1.0
+        tl_kpt = np.reshape(tl_kpt, (-1, 3))
+        br_kpt = np.reshape(br_kpt, (-1, 3))
+        fx, fy = camera_param['f']
+        cx, cy = camera_param['c']
+
+        tl2d = self.camera_to_pixel(tl_kpt, fx, fy, cx, cy)
+        br2d = self.camera_to_pixel(br_kpt, fx, fy, cx, cy)
+
+        rectangle_3d_size = 2.0
+        kpts_3d_image = np.zeros_like(kpts_3d_cam)
+        kpts_3d_image[..., :2] = self.camera_to_pixel(kpts_3d_cam.copy(), fx,
+                                                      fy, cx, cy)
+        ratio = (br2d[..., 0] - tl2d[..., 0] + 0.001) / rectangle_3d_size
+        factor = rectangle_3d_size / (br2d[..., 0] - tl2d[..., 0] + 0.001)
+
+        kpts_3d_depth = ratio[:, None] * (kpts_3d_cam[..., 2] - root[..., 2])
+        kpts_3d_image[..., 2] = kpts_3d_depth
+        return kpts_3d_image, factor
+
+    def camera_to_pixel(self,
+                        kpts_3d: np.ndarray,
+                        fx: float,
+                        fy: float,
+                        cx: float,
+                        cy: float,
+                        shift: bool = False) -> np.ndarray:
+        """Project keypoints from camera space to image space.
+
+        Args:
+            kpts_3d (np.ndarray): Keypoint coordinates in camera space.
+            fx (float): x-coordinate of camera's focal length.
+            fy (float): y-coordinate of camera's focal length.
+            cx (float): x-coordinate of image center.
+            cy (float): y-coordinate of image center.
+            shift (bool): Whether to shift the coordinates by 1e-8.
+
+        Returns:
+            pose_2d (np.ndarray): Projected keypoint coordinates in image
+                space.
+        """
+        if not shift:
+            pose_2d = kpts_3d[..., :2] / kpts_3d[..., 2:3]
+        else:
+            pose_2d = kpts_3d[..., :2] / (kpts_3d[..., 2:3] + 1e-8)
+        pose_2d[..., 0] *= fx
+        pose_2d[..., 1] *= fy
+        pose_2d[..., 0] += cx
+        pose_2d[..., 1] += cy
+        return pose_2d
