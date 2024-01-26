@@ -426,6 +426,7 @@ class RandomHalfBody3D(BaseTransform):
         return results
 
 
+@TRANSFORMS.register_module()
 class CoordCorrectionAndRandomRotate(BaseTransform):
 
     def transform(self, results: Dict) -> Optional[dict]:
