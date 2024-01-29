@@ -328,6 +328,7 @@ class H3WBDataset(BaseMocapDataset):
         for subject in self.subjects:
             actions = self.ann_data[subject].keys()
             for act in actions:
+                kpts_global = self.ann_data[subject][act]['global_3d']
                 for cam in self.camera_order_id:
                     keypoints_2d = self.ann_data[subject][act][cam]['pose_2d']
                     keypoints_3d = self.ann_data[subject][act][cam][
@@ -382,6 +383,8 @@ class H3WBDataset(BaseMocapDataset):
                             _kpts_2d,
                             'keypoints_3d':
                             _kpts_3d / 1000,
+                            'keypoints_global':
+                            kpts_global,
                             'keypoints_visible':
                             np.ones_like(_kpts_2d[..., 0], dtype=np.float32),
                             'keypoints_3d_visible':

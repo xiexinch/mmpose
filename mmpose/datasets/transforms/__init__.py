@@ -13,8 +13,9 @@ from .hand_transforms import HandRandomFlip
 from .loading import LoadImage
 from .mix_img_transforms import Mosaic, YOLOXMixUp
 from .pose3d_transforms import (CoordCorrectionAndRandomRotate,
-                                RandomDropInput, RandomFlipAroundRoot,
-                                RandomHalfBody3D, RandomPerturb2DKeypoints,
+                                GlobalSkeletonTarget, RandomDropInput,
+                                RandomFlipAroundRoot, RandomHalfBody3D,
+                                RandomPerturb2DKeypoints,
                                 RandomPerturbScoreBalance)
 from .topdown_transforms import TopdownAffine
 
@@ -28,5 +29,5 @@ __all__ = [
     'BottomupRandomCrop', 'BottomupRandomChoiceResize', 'HandRandomFlip',
     'SingleHandConverter', 'KeypointSelector', 'RandomPerturb2DKeypoints',
     'RandomDropInput', 'RandomPerturbScoreBalance', 'RandomHalfBody3D',
-    'CoordCorrectionAndRandomRotate'
+    'CoordCorrectionAndRandomRotate', 'GlobalSkeletonTarget'
 ]

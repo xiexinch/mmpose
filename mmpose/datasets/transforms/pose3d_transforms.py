@@ -430,10 +430,8 @@ class RandomHalfBody3D(BaseTransform):
 class CoordCorrectionAndRandomRotate(BaseTransform):
 
     def transform(self, results: Dict) -> Optional[dict]:
-        # print(results['keypoints_3d'].shape)
-        # print(results['lifting_target'].shape)
-        # print(results['keypoints'].shape)
-        assert 'camera_param' in results
+        if 'camera_param' not in results:
+            return results
         cam_param = results['camera_param']
 
         assert 'R' in cam_param and 'T' in cam_param
@@ -441,34 +439,47 @@ class CoordCorrectionAndRandomRotate(BaseTransform):
         T = cam_param['T'].reshape(3, )
 
         keypoints_3d = results['keypoints_3d']
-        keypoints_global = np.dot(keypoints_3d - T, R.T.T)
+        keypoints_global = np.dot(keypoints_3d - T,
+                                  R.T.T) * 1000  # convert unit to mm
 
-        root = keypoints_global[..., [11, 12], :].mean(1)
-        # rotate to camera space
-        rot_x_90 = np.array(
-            [[1, 0, 0], [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
-             [0, np.sin(np.pi / 2), np.cos(np.pi / 2)]],
-            dtype=np.float32)
+        # rotate around axes
+        rot_x_90 = np.around(
+            np.array([[1, 0, 0], [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
+                      [0, np.sin(np.pi / 2),
+                       np.cos(np.pi / 2)]],
+                     dtype=np.float32), 3)
+        arc = np.around(np.random.random() * np.pi * 2, 3)
+        rot_y = np.around(
+            np.array([[np.cos(arc), 0, np.sin(arc)], [0, 1, 0],
+                      [-np.sin(arc), 0, np.cos(arc)]],
+                     dtype=np.float32), 3)
+        rot = np.dot(rot_y, rot_x_90)
+        keypoints_3d = np.dot(keypoints_global, rot.T)
 
-        keypoints_g2c = np.dot(keypoints_global - root, rot_x_90.T) + root
-        root_new = keypoints_g2c[..., [11, 12], :].mean(1)
-        # random rotate around root
-        arc = np.random.random() * np.pi * 2
-        rot_y = np.array([[np.cos(arc), 0, np.sin(arc)], [0, 1, 0],
-                          [-np.sin(arc), 0, np.cos(arc)]])
-        keypoints_3d = np.dot(keypoints_g2c - root_new, rot_y.T) + root_new
+        # rotate around root
+        # root = keypoints_global[..., [11, 12], :].mean(1)
+        # # rotate to camera space
+        # rot_x_90 = np.array(
+        #     [[1, 0, 0], [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
+        #      [0, np.sin(np.pi / 2), np.cos(np.pi / 2)]],
+        #     dtype=np.float32)
+
+        # keypoints_g2c = np.dot(keypoints_global - root, rot_x_90.T) + root
+        # root_new = keypoints_g2c[..., [11, 12], :].mean(1)
+        # # random rotate around root
+        # arc = np.random.random() * np.pi * 2
+        # rot_y = np.array([[np.cos(arc), 0, np.sin(arc)], [0, 1, 0],
+        #                   [-np.sin(arc), 0, np.cos(arc)]])
+        # keypoints_3d = np.dot(keypoints_g2c - root_new, rot_y.T) + root_new
 
         # new 2d keypoints
-        f, c = np.array(cam_param['f']), np.array(cam_param['c'])
-        cam_ = {'f': f, 'c': c}
-        keypoints_2d, factor = self.camera_to_image_coord([11, 12],
-                                                          keypoints_3d, cam_)
-        keypoints_2d = keypoints_2d[..., :2]
+        fx, fy = cam_param['f']
+        cx, cy = cam_param['c']
+        keypoints_2d = self.camera_to_pixel(keypoints_3d, fx, fy, cx, cy, True)
 
         results['keypoints_3d'] = keypoints_3d.astype(np.float32)
         results['lifting_target'] = keypoints_3d.astype(np.float32)
         results['keypoints'] = keypoints_2d.astype(np.float32)
-        results['factor'] = factor
         return results
 
     def camera_to_image_coord(self, root_index: int, kpts_3d_cam: np.ndarray,
@@ -546,3 +557,13 @@ class CoordCorrectionAndRandomRotate(BaseTransform):
         pose_2d[..., 0] += cx
         pose_2d[..., 1] += cy
         return pose_2d
+
+
+@TRANSFORMS.register_module()
+class GlobalSkeletonTarget(BaseTransform):
+
+    def transform(self, results: Dict) -> Optional[dict]:
+        if 'keypoints_global' in results:
+            results['lifting_target'] = results['keypoints_global']
+            results['keypoints_3d'] = results['keypoints_global']
+        return results
