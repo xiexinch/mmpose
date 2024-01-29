@@ -430,8 +430,11 @@ class RandomHalfBody3D(BaseTransform):
 class CoordCorrectionAndRandomRotate(BaseTransform):
 
     def transform(self, results: Dict) -> Optional[dict]:
-        assert 'cam_param' in results
-        cam_param = results['cam_param']
+        # print(results['keypoints_3d'].shape)
+        # print(results['lifting_target'].shape)
+        # print(results['keypoints'].shape)
+        assert 'camera_param' in results
+        cam_param = results['camera_param']
 
         assert 'R' in cam_param and 'T' in cam_param
         R = cam_param['R'].reshape(3, 3)
@@ -440,16 +443,15 @@ class CoordCorrectionAndRandomRotate(BaseTransform):
         keypoints_3d = results['keypoints_3d']
         keypoints_global = np.dot(keypoints_3d - T, R.T.T)
 
-        root = keypoints_global[[11, 12]].mean(0)
-
+        root = keypoints_global[..., [11, 12], :].mean(1)
         # rotate to camera space
-        rot_x_90 = np.array([[1, 0, 0],
-                             [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
-                             [0, np.sin(np.pi / 2),
-                              np.cos(np.pi / 2)]])
+        rot_x_90 = np.array(
+            [[1, 0, 0], [0, np.cos(np.pi / 2), -np.sin(np.pi / 2)],
+             [0, np.sin(np.pi / 2), np.cos(np.pi / 2)]],
+            dtype=np.float32)
 
         keypoints_g2c = np.dot(keypoints_global - root, rot_x_90.T) + root
-        root_new = keypoints_g2c[[11, 12]].mean(0)
+        root_new = keypoints_g2c[..., [11, 12], :].mean(1)
         # random rotate around root
         arc = np.random.random() * np.pi * 2
         rot_y = np.array([[np.cos(arc), 0, np.sin(arc)], [0, 1, 0],
@@ -459,11 +461,14 @@ class CoordCorrectionAndRandomRotate(BaseTransform):
         # new 2d keypoints
         f, c = np.array(cam_param['f']), np.array(cam_param['c'])
         cam_ = {'f': f, 'c': c}
-        keypoints_2d = self.camera_to_image_coord([11, 12], keypoints_3d, cam_)
+        keypoints_2d, factor = self.camera_to_image_coord([11, 12],
+                                                          keypoints_3d, cam_)
+        keypoints_2d = keypoints_2d[..., :2]
 
-        results['keypoints_3d'] = keypoints_3d
-        results['lifting_target'] = keypoints_3d
-        results['keypoints'] = keypoints_2d
+        results['keypoints_3d'] = keypoints_3d.astype(np.float32)
+        results['lifting_target'] = keypoints_3d.astype(np.float32)
+        results['keypoints'] = keypoints_2d.astype(np.float32)
+        results['factor'] = factor
         return results
 
     def camera_to_image_coord(self, root_index: int, kpts_3d_cam: np.ndarray,
@@ -501,7 +506,7 @@ class CoordCorrectionAndRandomRotate(BaseTransform):
         br2d = self.camera_to_pixel(br_kpt, fx, fy, cx, cy)
 
         rectangle_3d_size = 2.0
-        kpts_3d_image = np.zeros_like(kpts_3d_cam)
+        kpts_3d_image = np.zeros_like(kpts_3d_cam, dtype=np.float32)
         kpts_3d_image[..., :2] = self.camera_to_pixel(kpts_3d_cam.copy(), fx,
                                                       fy, cx, cy)
         ratio = (br2d[..., 0] - tl2d[..., 0] + 0.001) / rectangle_3d_size
