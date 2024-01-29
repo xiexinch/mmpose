@@ -369,7 +369,7 @@ class H3WBDataset(BaseMocapDataset):
 
                         _kpts_2d = keypoints_2d[frame_ids]
                         _kpts_3d = keypoints_3d[frame_ids]
-
+                        _kpts_global = kpts_global[frame_ids]
                         target_idx = [-1] if self.causal else [
                             int(self.seq_len) // 2
                         ]
@@ -384,7 +384,7 @@ class H3WBDataset(BaseMocapDataset):
                             'keypoints_3d':
                             _kpts_3d / 1000,
                             'keypoints_global':
-                            kpts_global,
+                            _kpts_global / 1000,
                             'keypoints_visible':
                             np.ones_like(_kpts_2d[..., 0], dtype=np.float32),
                             'keypoints_3d_visible':
