@@ -219,9 +219,9 @@ class L4(nn.Module):
         self.num_keypoints = num_keypoints
         self.token_dims = token_dims
 
-        pos_dim = 3 if with_vis_scores else 2
+        self.pos_dim = 3 if with_vis_scores else 2
 
-        self.pos_w = nn.Parameter(torch.randn((pos_dim, token_dims)))
+        self.pos_w = nn.Parameter(torch.randn((self.pos_dim, token_dims)))
         self.pos_b = nn.Parameter(torch.randn((token_dims)))
 
         self.graph_layers = nn.ModuleList([
@@ -239,6 +239,8 @@ class L4(nn.Module):
         return x
 
     def forward(self, x: torch.Tensor):
+        if self.ndim == 4:
+            x = x.reshape(x.shape[0], self.num_keypoints, self.pos_dim)
         x = self.token_positional_encoding(x)
 
         for layer in self.graph_layers:
