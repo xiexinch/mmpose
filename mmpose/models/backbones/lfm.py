@@ -154,6 +154,89 @@ class GraphAttention(nn.Module):
         return out
 
 
+class SparseGraphAttention(nn.Module):
+
+    def __init__(self,
+                 in_channels: int = 1024,
+                 out_channels: int = 1024,
+                 num_heads: int = 8,
+                 is_concat: bool = True,
+                 dropout: float = 0.6,
+                 leaky_relu_negative_slope: float = 0.2,
+                 adj_mat=None,
+                 num_nodes: int = 133):
+        super().__init__()
+        self.is_concat = is_concat
+        self.num_heads = num_heads
+
+        if is_concat:
+            assert out_channels % num_heads == 0
+            self.channels = out_channels // num_heads
+        else:
+            self.channels = out_channels
+
+        self.linear = nn.Linear(
+            in_channels, self.channels * self.num_heads, bias=False)
+        self.attn = nn.Linear(self.channels * 2, 1, bias=False)
+        self.activation = nn.LeakyReLU(
+            negative_slope=leaky_relu_negative_slope)
+        self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+
+        if adj_mat is None:
+            raise ValueError('adj_mat is empty')
+        else:
+            adj_mat = torch.tensor(
+                adj_mat, dtype=torch.float32, requires_grad=False)
+            adj_mat = adj_mat.to_sparse()
+            assert adj_mat.shape[0] == 1 or adj_mat.shape[0] == num_nodes
+            assert adj_mat.shape[1] == 1 or adj_mat.shape[1] == num_nodes
+            assert adj_mat.shape[2] == 1 or adj_mat.shape[2] == self.num_heads
+            self.adj_mat = adj_mat
+
+    def forward(self, x: torch.Tensor):
+        B, N, _ = x.shape
+        g = self.linear(x)
+        g = g.view(B, N, self.num_heads, self.channels)
+
+        # Extract edges from the sparse adjacency matrix
+        edges = self.adj_mat._indices()
+
+        # Extract and concatenate features for source and target nodes
+        g_source = g[:, edges[0], :, :]
+        g_target = g[:, edges[1], :, :]
+        g_concat = torch.cat([g_source, g_target], dim=-1)
+
+        # Compute attention scores
+        e = self.activation(self.attn(g_concat)).squeeze(-1)
+        a = self.softmax(e)
+
+        # Apply dropout to attention scores
+        a = self.dropout(a)
+
+        # Weighted features of target nodes
+        g_target_weighted = g_target * a.unsqueeze(-1)
+
+        # Initialize aggregated feature tensor
+        g_agg = torch.zeros(
+            B, N, self.num_heads, self.channels, device=x.device)
+
+        # Aggregate weighted features back to their source nodes
+        indices = edges[0].unsqueeze(-1).unsqueeze(-1).expand(
+            -1, self.num_heads, self.channels)
+        indices = indices.repeat(B, 1, 1, 1)
+
+        g_agg.scatter_add_(1, indices, g_target_weighted)
+
+        # Reshape or aggregate the heads
+        if self.is_concat:
+            out = g_agg.reshape(B, N, self.num_heads * self.channels)
+        else:
+            out = g_agg.mean(dim=2)
+
+        return out
+
+
 class GraphTransformerLayer(nn.Module):
 
     def __init__(self,
@@ -168,7 +251,7 @@ class GraphTransformerLayer(nn.Module):
         self.token_dims = token_dims
 
         # Graph Attention
-        self.ga = GraphAttention(
+        self.ga = SparseGraphAttention(
             token_dims,
             token_dims,
             num_heads,
