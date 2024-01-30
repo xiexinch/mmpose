@@ -140,8 +140,8 @@ class GraphAttention(nn.Module):
                              dim=-1).view(B, N, N, self.num_heads,
                                           self.channels * 2)
         e = self.activation(self.attn(g_concat)).squeeze(-1)
-
-        e = e.masked_fill(self.adj_mat == 0, float('-inf'))
+        adj_mat = self.adj_mat.to(e)
+        e = e.masked_fill(adj_mat == 0, float('-inf'))
         a = self.softmax(e)
         a = self.dropout(a)
 
@@ -234,8 +234,9 @@ class L4(nn.Module):
         assert inputs.ndim == 3
 
         x = torch.matmul(inputs, self.pos_w) + self.pos_b
-        x[:, 0::2, :] = torch.sin(x[:, 0::2, :])
-        x[:, 1::2, :] = torch.cos(x[:, 1::2, :])
+        x_ = torch.zeros_like(x).to(x)
+        x_[:, 0::2, :] = torch.sin(x[:, 0::2, :])
+        x_[:, 1::2, :] = torch.cos(x[:, 1::2, :])
         return x
 
     def forward(self, x: torch.Tensor):
