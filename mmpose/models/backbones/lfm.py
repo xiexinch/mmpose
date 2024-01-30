@@ -239,7 +239,7 @@ class L4(nn.Module):
         return x
 
     def forward(self, x: torch.Tensor):
-        if self.ndim == 4:
+        if x.ndim == 4:
             x = x.reshape(x.shape[0], self.num_keypoints, self.pos_dim)
         x = self.token_positional_encoding(x)
 
