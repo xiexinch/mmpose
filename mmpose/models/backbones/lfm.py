@@ -200,7 +200,8 @@ class SparseGraphAttention(nn.Module):
         g = g.view(B, N, self.num_heads, self.channels)
 
         # Extract edges from the sparse adjacency matrix
-        edges = self.adj_mat._indices()
+        adj = self.adj_mat.to(x.device)
+        edges = adj._indices()
 
         # Extract and concatenate features for source and target nodes
         g_source = g[:, edges[0], :, :]
