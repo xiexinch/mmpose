@@ -389,7 +389,8 @@ class L5(nn.Module):
                  num_heads: int = 8,
                  msa_drop_out: float = 0.1,
                  ga_drop_out: float = 0.6,
-                 adj_mat: List = []):
+                 adj_mat: List = [],
+                 sigma: float = 1.0):
         super().__init__()
 
         self.num_keypoints = num_keypoints
@@ -397,8 +398,10 @@ class L5(nn.Module):
 
         self.pos_dim = 3 if with_vis_scores else 2
 
-        self.pos_w = nn.Parameter(torch.randn((self.pos_dim, token_dims)))
-        self.pos_b = nn.Parameter(torch.randn((token_dims)))
+        # 初始化随机频率向量作为不需要梯度的模型参数
+        self.omega = nn.Parameter(
+            torch.randn(int(self.token_dims / 2), self.pos_dim) / sigma,
+            requires_grad=False)
 
         self.graph_layers = nn.ModuleList([
             GraphTransformerLayer2(token_dims, num_heads, msa_drop_out,
@@ -407,12 +410,121 @@ class L5(nn.Module):
         ])
 
     def token_positional_encoding(self, inputs: torch.Tensor):
-        assert inputs.ndim == 3
+        # 计算输入和频率向量的点积
+        dot_product = torch.einsum('bni,di->bnd', inputs, self.omega)
+        # 应用余弦和正弦函数获取特征
+        x = torch.cat((torch.cos(dot_product), torch.sin(dot_product)), dim=-1)
+        return x
 
-        x = torch.matmul(inputs, self.pos_w) + self.pos_b
-        x_ = torch.zeros_like(x).to(x)
-        x_[:, 0::2, :] = torch.sin(x[:, 0::2, :])
-        x_[:, 1::2, :] = torch.cos(x[:, 1::2, :])
+    def forward(self, x: torch.Tensor):
+        if x.ndim == 4:
+            x = x.reshape(x.shape[0], self.num_keypoints, self.pos_dim)
+        x = self.token_positional_encoding(x)
+
+        for layer in self.graph_layers:
+            x = layer(x)
+        return tuple([x])
+
+
+class GraphTransformerLayer3(nn.Module):
+
+    def __init__(self,
+                 token_dims: int = 1024,
+                 num_heads: int = 8,
+                 msa_drop_out: float = 0.1,
+                 ga_drop_out: float = 0.6,
+                 adj_mat: List = [],
+                 num_nodes: int = 133,
+                 mlp_ratio: int = 4,
+                 gau_cfg: ConfigType = dict(
+                     hidden_dims=1024,
+                     s=128,
+                     expansion_factor=2,
+                     dropout_rate=0.,
+                     drop_path=0.,
+                     act_fn='ReLU',
+                     use_rel_bias=False,
+                     pos_enc=False)):
+        super().__init__()
+        self.token_dims = token_dims
+
+        # Graph Attention
+        self.ga = SparseGraphAttention(
+            token_dims,
+            token_dims,
+            num_heads,
+            is_concat=True,
+            dropout=ga_drop_out,
+            leaky_relu_negative_slope=0.2,
+            adj_mat=adj_mat,
+            num_nodes=num_nodes)
+
+        # Multi Head Attention
+        self.gau = RTMCCBlock(
+            token_dims,
+            gau_cfg['hidden_dims'],
+            gau_cfg['hidden_dims'],
+            s=gau_cfg['s'],
+            expansion_factor=gau_cfg['expansion_factor'],
+            dropout_rate=gau_cfg['dropout_rate'],
+            attn_type='self-attn',
+            use_rel_bias=gau_cfg['use_rel_bias'],
+            pos_enc=gau_cfg['pos_enc'])
+
+        # Residual Connection
+        self.ln1 = nn.LayerNorm(token_dims * 2)
+        self.ln2 = nn.LayerNorm(token_dims)
+
+        # MLP GELU
+        self.mlp_gelu = nn.Sequential(
+            nn.Linear(token_dims * 2, int(token_dims * mlp_ratio)), nn.GELU(),
+            nn.Linear(int(token_dims * mlp_ratio), token_dims))
+
+    def forward(self, inputs: torch.Tensor):
+        feat_l = self.ga(inputs)
+        feat_g = self.gau(inputs)
+        feat = torch.cat([feat_l, feat_g], dim=-1)
+        x = self.ln1(feat) + feat
+        x = self.ln2(self.mlp_gelu(x))
+        return x
+
+
+@MODELS.register_module()
+class L6(nn.Module):
+
+    def __init__(self,
+                 num_keypoints: int = 133,
+                 with_vis_scores: bool = False,
+                 token_dims: int = 1024,
+                 num_graph_layers: int = 3,
+                 num_heads: int = 8,
+                 msa_drop_out: float = 0.1,
+                 ga_drop_out: float = 0.6,
+                 adj_mat: List = [],
+                 sigma: float = 1.0):
+        super().__init__()
+
+        self.num_keypoints = num_keypoints
+        self.token_dims = token_dims
+
+        self.pos_dim = 3 if with_vis_scores else 2
+
+        # 初始化随机频率向量作为不需要梯度的模型参数
+        self.omega = nn.Parameter(
+            torch.randn(int(self.token_dims / 2), self.pos_dim) / sigma,
+            requires_grad=False)
+
+        self.graph_layers = nn.ModuleList([
+            GraphTransformerLayer3(token_dims, num_heads, msa_drop_out,
+                                   ga_drop_out, adj_mat, num_keypoints)
+            for _ in range(num_graph_layers)
+        ])
+
+    def token_positional_encoding(self, inputs: torch.Tensor):
+        # 计算输入和频率向量的点积
+        dot_product = torch.einsum('bni,di->bnd', inputs, self.omega)
+        # 应用余弦和正弦函数获取特征
+        x = torch.cat((torch.cos(dot_product), torch.sin(dot_product)), dim=-1)
         return x
 
     def forward(self, x: torch.Tensor):
