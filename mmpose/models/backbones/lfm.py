@@ -501,7 +501,16 @@ class L6(nn.Module):
                  msa_drop_out: float = 0.1,
                  ga_drop_out: float = 0.6,
                  adj_mat: List = [],
-                 sigma: float = 1.0):
+                 sigma: float = 1.0,
+                 gau_cfg: ConfigType = dict(
+                     hidden_dims=1024,
+                     s=128,
+                     expansion_factor=2,
+                     dropout_rate=0.,
+                     drop_path=0.,
+                     act_fn='ReLU',
+                     use_rel_bias=False,
+                     pos_enc=False)):
         super().__init__()
 
         self.num_keypoints = num_keypoints
@@ -515,9 +524,14 @@ class L6(nn.Module):
             requires_grad=False)
 
         self.graph_layers = nn.ModuleList([
-            GraphTransformerLayer3(token_dims, num_heads, msa_drop_out,
-                                   ga_drop_out, adj_mat, num_keypoints)
-            for _ in range(num_graph_layers)
+            GraphTransformerLayer3(
+                token_dims,
+                num_heads,
+                msa_drop_out,
+                ga_drop_out,
+                adj_mat,
+                num_keypoints,
+                gau_cfg=gau_cfg) for _ in range(num_graph_layers)
         ])
 
     def token_positional_encoding(self, inputs: torch.Tensor):
