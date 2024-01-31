@@ -330,5 +330,96 @@ class L4(nn.Module):
 
         for layer in self.graph_layers:
             x = layer(x)
-            x = nn.GELU()(x)
+        return tuple([x])
+
+
+class GraphTransformerLayer2(nn.Module):
+
+    def __init__(self,
+                 token_dims: int = 1024,
+                 num_heads: int = 8,
+                 msa_drop_out: float = 0.1,
+                 ga_drop_out: float = 0.6,
+                 adj_mat: List = [],
+                 num_nodes: int = 133,
+                 mlp_ratio: int = 4):
+        super().__init__()
+        self.token_dims = token_dims
+
+        # Graph Attention
+        self.ga = SparseGraphAttention(
+            token_dims,
+            token_dims,
+            num_heads,
+            is_concat=True,
+            dropout=ga_drop_out,
+            leaky_relu_negative_slope=0.2,
+            adj_mat=adj_mat,
+            num_nodes=num_nodes)
+
+        # Multi Head Attention
+        self.msa = nn.MultiheadAttention(token_dims, num_heads, msa_drop_out)
+
+        # Residual Connection
+        self.ln1 = nn.LayerNorm(token_dims * 2)
+        self.ln2 = nn.LayerNorm(token_dims)
+
+        # MLP GELU
+        self.mlp_gelu = nn.Sequential(
+            nn.Linear(token_dims * 2, int(token_dims * mlp_ratio)), nn.GELU(),
+            nn.Linear(int(token_dims * mlp_ratio), token_dims))
+
+    def forward(self, inputs: torch.Tensor):
+        feat_l = self.ga(inputs)
+        feat_g = self.msa(inputs, inputs, inputs)[0]
+        feat = torch.cat([feat_l, feat_g], dim=-1)
+        x = self.ln1(feat) + feat
+        x = self.ln2(self.mlp_gelu(x))
+        return x
+
+
+@MODELS.register_module()
+class L5(nn.Module):
+
+    def __init__(self,
+                 num_keypoints: int = 133,
+                 with_vis_scores: bool = False,
+                 token_dims: int = 1024,
+                 num_graph_layers: int = 3,
+                 num_heads: int = 8,
+                 msa_drop_out: float = 0.1,
+                 ga_drop_out: float = 0.6,
+                 adj_mat: List = []):
+        super().__init__()
+
+        self.num_keypoints = num_keypoints
+        self.token_dims = token_dims
+
+        self.pos_dim = 3 if with_vis_scores else 2
+
+        self.pos_w = nn.Parameter(torch.randn((self.pos_dim, token_dims)))
+        self.pos_b = nn.Parameter(torch.randn((token_dims)))
+
+        self.graph_layers = nn.ModuleList([
+            GraphTransformerLayer2(token_dims, num_heads, msa_drop_out,
+                                   ga_drop_out, adj_mat, num_keypoints)
+            for _ in range(num_graph_layers)
+        ])
+
+    def token_positional_encoding(self, inputs: torch.Tensor):
+        assert inputs.ndim == 3
+
+        x = torch.matmul(inputs, self.pos_w) + self.pos_b
+        x_ = torch.zeros_like(x).to(x)
+        x_[:, 0::2, :] = torch.sin(x[:, 0::2, :])
+        x_[:, 1::2, :] = torch.cos(x[:, 1::2, :])
+        return x
+
+    def forward(self, x: torch.Tensor):
+        if x.ndim == 4:
+            x = x.reshape(x.shape[0], self.num_keypoints, self.pos_dim)
+        x = self.token_positional_encoding(x)
+
+        for layer in self.graph_layers:
+            x = layer(x)
         return tuple([x])
