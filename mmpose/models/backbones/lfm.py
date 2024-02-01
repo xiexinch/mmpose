@@ -157,26 +157,28 @@ class GraphAttention(nn.Module):
 class SparseGraphAttention(nn.Module):
 
     def __init__(self,
-                 in_channels: int = 1024,
-                 out_channels: int = 1024,
-                 num_heads: int = 8,
-                 is_concat: bool = True,
-                 dropout: float = 0.6,
-                 leaky_relu_negative_slope: float = 0.2,
+                 in_channels=1024,
+                 out_channels=1024,
+                 num_heads=8,
+                 is_concat=True,
+                 dropout=0.6,
+                 leaky_relu_negative_slope=0.2,
                  adj_mat=None,
-                 num_nodes: int = 133):
+                 num_nodes=133):
         super().__init__()
         self.is_concat = is_concat
         self.num_heads = num_heads
+        self.num_nodes = num_nodes
 
         if is_concat:
-            assert out_channels % num_heads == 0
+            assert out_channels % num_heads == 0, 'Out channels'\
+                'must be a multiple of num_heads when is_concat is True'
             self.channels = out_channels // num_heads
         else:
             self.channels = out_channels
 
         self.linear = nn.Linear(
-            in_channels, self.channels * self.num_heads, bias=False)
+            in_channels, self.channels * num_heads, bias=False)
         self.attn = nn.Linear(self.channels * 2, 1, bias=False)
         self.activation = nn.LeakyReLU(
             negative_slope=leaky_relu_negative_slope)
@@ -188,45 +190,47 @@ class SparseGraphAttention(nn.Module):
         else:
             adj_mat = torch.tensor(
                 adj_mat, dtype=torch.float32, requires_grad=False)
-            adj_mat = adj_mat.to_sparse()
             assert adj_mat.shape[0] == 1 or adj_mat.shape[0] == num_nodes
             assert adj_mat.shape[1] == 1 or adj_mat.shape[1] == num_nodes
             assert adj_mat.shape[2] == 1 or adj_mat.shape[2] == self.num_heads
-            self.adj_mat = adj_mat
+            adj_mat = adj_mat.to_sparse().coalesce()
+            edges = adj_mat.indices()
+            self.register_buffer('edges', edges)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x):
         B, N, _ = x.shape
-        g = self.linear(x)
-        g = g.view(B, N, self.num_heads, self.channels)
+        assert N == self.num_nodes, 'The number of nodes in the input not'\
+            'match the expected number'
 
-        # Extract edges from the sparse adjacency matrix
-        adj = self.adj_mat.to(x.device)
-        edges = adj._indices()
+        # Linear transformation and reshape
+        g = self.linear(x).view(B, N, self.num_heads, self.channels)
+
+        # Prepare indices for the edges
+        # Note: adj_mat is expected to be a sparse tensor with indices of edges
+        edge_indices = self.edges
+        row, col = edge_indices[0], edge_indices[1]
 
         # Extract and concatenate features for source and target nodes
-        g_source = g[:, edges[0], :, :]
-        g_target = g[:, edges[1], :, :]
-        g_concat = torch.cat([g_source, g_target], dim=-1)
+        g_source = g[:, row, :, :]  # Shape: [B, E, num_heads, channels]
+        g_target = g[:, col, :, :]  # Shape: [B, E, num_heads, channels]
+        g_concat = torch.cat([g_source, g_target],
+                             dim=-1)  # Shape: [B, E, num_heads, 2 * channels]
 
         # Compute attention scores
-        e = self.activation(self.attn(g_concat)).squeeze(-1)
-        a = self.softmax(e)
-
-        # Apply dropout to attention scores
-        a = self.dropout(a)
+        e = self.activation(self.attn(g_concat)).squeeze(
+            -1)  # Shape: [B, E, num_heads]
+        a = self.softmax(e)  # Shape: [B, E, num_heads]
+        a = self.dropout(a)  # Apply dropout to attention scores
 
         # Weighted features of target nodes
-        g_target_weighted = g_target * a.unsqueeze(-1)
-
-        # Initialize aggregated feature tensor
-        g_agg = torch.zeros(
-            B, N, self.num_heads, self.channels, device=x.device)
+        g_target_weighted = g_target * a.unsqueeze(
+            -1)  # Shape: [B, E, num_heads, channels]
 
         # Aggregate weighted features back to their source nodes
-        indices = edges[0].unsqueeze(-1).unsqueeze(-1).expand(
-            -1, self.num_heads, self.channels)
-        indices = indices.repeat(B, 1, 1, 1)
-
+        g_agg = torch.zeros(
+            B, N, self.num_heads, self.channels, device=x.device)
+        indices = row.unsqueeze(-1).unsqueeze(-1).expand(
+            B, -1, self.num_heads, self.channels)
         g_agg.scatter_add_(1, indices, g_target_weighted)
 
         # Reshape or aggregate the heads
