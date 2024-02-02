@@ -553,3 +553,213 @@ class L6(nn.Module):
         for layer in self.graph_layers:
             x = layer(x)
         return tuple([x])
+
+
+# -------------------------------------------------------------------------------------------------------------
+
+
+class SparseGraphAttention2(nn.Module):
+
+    def __init__(self,
+                 in_channels=1024,
+                 out_channels=1024,
+                 num_heads=8,
+                 is_concat=True,
+                 dropout=0.6,
+                 leaky_relu_negative_slope=0.2,
+                 skeleton_links: List = [],
+                 num_nodes=133):
+        super().__init__()
+        self.is_concat = is_concat
+        self.num_heads = num_heads
+        self.num_nodes = num_nodes
+
+        if is_concat:
+            assert out_channels % num_heads == 0, 'Out channels'\
+                'must be a multiple of num_heads when is_concat is True'
+            self.channels = out_channels // num_heads
+        else:
+            self.channels = out_channels
+
+        self.linear = nn.Linear(
+            in_channels, self.channels * num_heads, bias=False)
+        self.attn = nn.Linear(self.channels * 2, 1, bias=False)
+        self.activation = nn.LeakyReLU(
+            negative_slope=leaky_relu_negative_slope)
+        self.softmax = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+
+        adj_mat = torch.zeros((num_nodes, num_nodes, num_heads),
+                              dtype=torch.float32,
+                              requires_grad=False)
+        for link in skeleton_links:
+            adj_mat[link[0], link[1], :] = 1.0
+            adj_mat[link[1], link[0], :] = 1.0
+        edges = adj_mat.to_sparse().coalesce().indices()
+        self.register_buffer('edges', edges)
+
+    def forward(self, x):
+        B, N, _ = x.shape
+        assert N == self.num_nodes, 'The number of nodes in the input not'\
+            'match the expected number'
+
+        # Linear transformation and reshape
+        g = self.linear(x).view(B, N, self.num_heads, self.channels)
+
+        # Prepare indices for the edges
+        # Note: adj_mat is expected to be a sparse tensor with indices of edges
+        edge_indices = self.edges
+        row, col = edge_indices[0], edge_indices[1]
+
+        # Extract and concatenate features for source and target nodes
+        g_source = g[:, row, :, :]  # Shape: [B, E, num_heads, channels]
+        g_target = g[:, col, :, :]  # Shape: [B, E, num_heads, channels]
+        g_concat = torch.cat([g_source, g_target],
+                             dim=-1)  # Shape: [B, E, num_heads, 2 * channels]
+
+        # Compute attention scores
+        e = self.activation(self.attn(g_concat)).squeeze(
+            -1)  # Shape: [B, E, num_heads]
+        a = self.softmax(e)  # Shape: [B, E, num_heads]
+        a = self.dropout(a)  # Apply dropout to attention scores
+
+        # Weighted features of target nodes
+        g_target_weighted = g_target * a.unsqueeze(
+            -1)  # Shape: [B, E, num_heads, channels]
+
+        # Aggregate weighted features back to their source nodes
+        g_agg = torch.zeros(
+            B, N, self.num_heads, self.channels, device=x.device)
+        indices = row.unsqueeze(-1).unsqueeze(-1).expand(
+            B, -1, self.num_heads, self.channels)
+        g_agg.scatter_add_(1, indices, g_target_weighted)
+
+        # Reshape or aggregate the heads
+        if self.is_concat:
+            out = g_agg.reshape(B, N, self.num_heads * self.channels)
+        else:
+            out = g_agg.mean(dim=2)
+
+        return out
+
+
+class GraphTransformerLayer4(nn.Module):
+
+    def __init__(self,
+                 token_dims: int = 1024,
+                 num_heads: int = 8,
+                 ga_drop_out: float = 0.6,
+                 num_nodes: int = 133,
+                 mlp_ratio: int = 4,
+                 skeleton_links: List = [],
+                 gau_cfg: ConfigType = dict(
+                     hidden_dims=1024,
+                     s=128,
+                     expansion_factor=2,
+                     dropout_rate=0.,
+                     drop_path=0.,
+                     act_fn='ReLU',
+                     use_rel_bias=False,
+                     pos_enc=False)):
+        super().__init__()
+        self.token_dims = token_dims
+
+        # Graph Attention
+        self.ga = SparseGraphAttention2(
+            token_dims,
+            token_dims,
+            num_heads,
+            is_concat=True,
+            dropout=ga_drop_out,
+            leaky_relu_negative_slope=0.2,
+            skeleton_links=skeleton_links,
+            num_nodes=num_nodes)
+
+        # Multi Head Attention
+        self.gau = RTMCCBlock(
+            token_dims,
+            gau_cfg['hidden_dims'],
+            gau_cfg['hidden_dims'],
+            s=gau_cfg['s'],
+            expansion_factor=gau_cfg['expansion_factor'],
+            dropout_rate=gau_cfg['dropout_rate'],
+            attn_type='self-attn',
+            use_rel_bias=gau_cfg['use_rel_bias'],
+            pos_enc=gau_cfg['pos_enc'])
+
+        # Residual Connection
+        self.ln1 = nn.LayerNorm(token_dims * 2)
+        self.ln2 = nn.LayerNorm(token_dims)
+
+        # MLP GELU
+        self.mlp_gelu = nn.Sequential(
+            nn.Linear(token_dims * 2, int(token_dims * mlp_ratio)), nn.GELU(),
+            nn.Linear(int(token_dims * mlp_ratio), token_dims))
+
+    def forward(self, inputs: torch.Tensor):
+        feat_l = self.ga(inputs)
+        feat_g = self.gau(inputs)
+        feat = torch.cat([feat_l, feat_g], dim=-1)
+        x = self.ln1(feat) + feat
+        x = self.ln2(self.mlp_gelu(x))
+        return x
+
+
+@MODELS.register_module()
+class L7(nn.Module):
+
+    def __init__(self,
+                 num_keypoints: int = 133,
+                 with_vis_scores: bool = False,
+                 token_dims: int = 1024,
+                 num_graph_layers: int = 3,
+                 num_heads: int = 8,
+                 ga_drop_out: float = 0.6,
+                 skeleton_links: List = [],
+                 sigma: float = 1.0,
+                 gau_cfg: ConfigType = dict(
+                     hidden_dims=1024,
+                     s=128,
+                     expansion_factor=2,
+                     dropout_rate=0.,
+                     drop_path=0.,
+                     act_fn='ReLU',
+                     use_rel_bias=False,
+                     pos_enc=False)):
+        super().__init__()
+
+        self.num_keypoints = num_keypoints
+        self.token_dims = token_dims
+
+        self.pos_dim = 3 if with_vis_scores else 2
+
+        # 初始化随机频率向量作为不需要梯度的模型参数
+        self.omega = nn.Parameter(
+            torch.randn(int(self.token_dims / 2), self.pos_dim) / sigma,
+            requires_grad=False)
+
+        self.graph_layers = nn.ModuleList([
+            GraphTransformerLayer4(
+                token_dims,
+                num_heads,
+                ga_drop_out,
+                num_nodes=num_keypoints,
+                skeleton_links=skeleton_links,
+                gau_cfg=gau_cfg) for _ in range(num_graph_layers)
+        ])
+
+    def token_positional_encoding(self, inputs: torch.Tensor):
+        # 计算输入和频率向量的点积
+        dot_product = torch.einsum('bni,di->bnd', inputs, self.omega)
+        # 应用余弦和正弦函数获取特征
+        x = torch.cat((torch.cos(dot_product), torch.sin(dot_product)), dim=-1)
+        return x
+
+    def forward(self, x: torch.Tensor):
+        if x.ndim == 4:
+            x = x.reshape(x.shape[0], self.num_keypoints, self.pos_dim)
+        x = self.token_positional_encoding(x)
+
+        for layer in self.graph_layers:
+            x = layer(x)
+        return tuple([x])

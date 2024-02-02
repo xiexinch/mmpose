@@ -8,7 +8,7 @@ from .hourglass import HourglassNet
 from .hourglass_ae import HourglassAENet
 from .hrformer import HRFormer
 from .hrnet import HRNet
-from .lfm import L3, L4, L5, L6, LargeSimpleBaseline
+from .lfm import L3, L4, L5, L6, L7, LargeSimpleBaseline
 from .litehrnet import LiteHRNet
 from .mobilenet_v2 import MobileNetV2
 from .mobilenet_v3 import MobileNetV3
@@ -38,5 +38,5 @@ __all__ = [
     'MSPN', 'ResNeSt', 'VGG', 'TCN', 'ViPNAS_ResNet', 'ViPNAS_MobileNetV3',
     'LiteHRNet', 'V2VNet', 'HRFormer', 'PyramidVisionTransformer',
     'PyramidVisionTransformerV2', 'SwinTransformer', 'DSTFormer', 'CSPDarknet',
-    'CSPNeXt', 'L3', 'L4', 'LargeSimpleBaseline', 'L5', 'L6'
+    'CSPNeXt', 'L3', 'L4', 'LargeSimpleBaseline', 'L5', 'L6', 'L7'
 ]
