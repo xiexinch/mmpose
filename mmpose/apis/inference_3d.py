@@ -331,10 +331,8 @@ def inference_pose_lifter_model(model,
         T, K, C = keypoints_2d.shape
 
         data_info['keypoints'] = keypoints_2d
-        data_info['keypoints_visible'] = np.ones((
-            T,
-            K,
-        ), dtype=np.float32)
+        data_info[
+            'keypoints_visible'] = pose_seq.pred_instances.keypoints_visible
         data_info['lifting_target'] = np.zeros((1, K, 3), dtype=np.float32)
         data_info['factor'] = np.zeros((T, ), dtype=np.float32)
         data_info['lifting_target_visible'] = np.ones((1, K, 1),

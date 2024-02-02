@@ -320,9 +320,7 @@ def process_one_image(args, detector, frame, frame_idx, pose_estimator,
         if keypoints.ndim == 4:
             keypoints = np.squeeze(keypoints, axis=1)
 
-        keypoints = keypoints[..., [0, 2, 1]]
-        keypoints[..., 0] = -keypoints[..., 0]
-        keypoints[..., 2] = -keypoints[..., 2]
+        keypoints = -keypoints[..., [0, 2, 1]]
 
         # rebase height (z-axis)
         if not args.disable_rebase_keypoint:
@@ -355,7 +353,8 @@ def process_one_image(args, detector, frame, frame_idx, pose_estimator,
             draw_bbox=True,
             kpt_thr=args.kpt_thr,
             num_instances=args.num_instances,
-            wait_time=args.show_interval)
+            wait_time=args.show_interval,
+            root_index=pose_lifter.cfg.model.head.decoder.root_index)
 
     return pose_est_results, pose_est_results_list, pred_3d_instances, next_id
 

@@ -86,7 +86,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                               axis_dist: float = 10.0,
                               axis_elev: float = 15.0,
                               show_kpt_idx: bool = False,
-                              scores_2d: Optional[np.ndarray] = None):
+                              scores_2d: Optional[np.ndarray] = None,
+                              root_index: Optional[Union[int, List]] = None):
         """Draw keypoints and skeletons (optional) of GT or prediction.
 
         Args:
@@ -155,11 +156,17 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                                     keypoints_visible,
                                     fig_idx,
                                     show_kpt_idx,
-                                    title=None):
-
+                                    title=None,
+                                    root_index: Optional[Union[int,
+                                                               List]] = None):
+            if root_index is None:
+                root_index = [0]
+            if isinstance(root_index, int):
+                root_index = [root_index]
             for idx, (kpts, score, score_2d) in enumerate(
                     zip(keypoints, scores, scores_2d)):
-
+                root = kpts[root_index, :].mean(0)
+                x_c, y_c, z_c = root
                 valid = np.logical_and(score >= kpt_thr, score_2d >= kpt_thr,
                                        np.any(~np.isnan(kpts), axis=-1))
 
@@ -177,10 +184,6 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                 if title:
                     ax.set_title(f'{title} ({idx})')
                 ax.dist = axis_dist
-
-                x_c = np.mean(kpts_valid[:, 0]) if valid.any() else 0
-                y_c = np.mean(kpts_valid[:, 1]) if valid.any() else 0
-                z_c = np.mean(kpts_valid[:, 2]) if valid.any() else 0
 
                 ax.set_xlim3d([x_c - axis_limit / 2, x_c + axis_limit / 2])
                 ax.set_ylim3d([y_c - axis_limit / 2, y_c + axis_limit / 2])
@@ -251,9 +254,15 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             else:
                 keypoints_visible = np.ones(keypoints.shape[:-1])
 
-            _draw_3d_instances_kpts(keypoints, scores, scores_2d,
-                                    keypoints_visible, 1, show_kpt_idx,
-                                    'Prediction')
+            _draw_3d_instances_kpts(
+                keypoints,
+                scores,
+                scores_2d,
+                keypoints_visible,
+                1,
+                show_kpt_idx,
+                'Prediction',
+                root_index=root_index)
 
         if draw_gt and 'gt_instances' in pose_samples:
             gt_instances = pose_samples.gt_instances
@@ -283,9 +292,15 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             if scores_2d is None:
                 scores_2d = np.ones(keypoints.shape[:-1])
 
-            _draw_3d_instances_kpts(keypoints, scores, scores_2d,
-                                    keypoints_visible, 2, show_kpt_idx,
-                                    'Ground Truth')
+            _draw_3d_instances_kpts(
+                keypoints,
+                scores,
+                scores_2d,
+                keypoints_visible,
+                2,
+                show_kpt_idx,
+                'Ground Truth',
+                root_index=root_index)
 
         # convert figure to numpy array
         fig.tight_layout()
@@ -510,6 +525,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                        wait_time: float = 0,
                        out_file: Optional[str] = None,
                        kpt_thr: float = 0.3,
+                       root_index: Optional[Union[int, List]] = None,
                        step: int = 0) -> None:
         """Draw datasample and save to all backends.
 
@@ -603,7 +619,8 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
             show_kpt_idx=show_kpt_idx,
             axis_dist=axis_dist,
             axis_elev=axis_elev,
-            scores_2d=scores_2d)
+            scores_2d=scores_2d,
+            root_index=root_index)
 
         # merge visualization results
         if det_img_data is not None:
