@@ -241,7 +241,7 @@ class RandomPerturbScoreBalance(RandomPerturb2DKeypoints):
         distance = np.linalg.norm(new_posision - keypoints, axis=-1)
         rates = distance / pertur_range
 
-        return keypoints, rates
+        return new_posision, rates
 
     def transform(self, results: dict) -> dict:
         prob = np.random.random()
