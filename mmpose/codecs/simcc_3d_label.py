@@ -63,11 +63,18 @@ class SimCC3DLabel(BaseKeypointCodec):
     label_mapping_table = dict(
         keypoint_x_labels='keypoint_x_labels',
         keypoint_y_labels='keypoint_y_labels',
-        keypoints_z_labels='keypoint_z_labels',
+        keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
     )
 
-    instance_mapping_table = dict(root_z='root_z', )
+    instance_mapping_table = dict(
+        root_z='root_z',
+        bbox='bboxes',
+        bbox_score='bbox_scores',
+        bbox_scale='bbox_scales',
+        lifting_target='lifting_target',
+        lifting_target_visible='lifting_target_visible',
+        camera_param='camera_param')
 
     def __init__(
         self,
@@ -125,10 +132,12 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoints_visible = np.ones(keypoints.shape[:2], dtype=np.float32)
 
         if keypoints_3d is not None:
-            root_z = keypoints_3d[self.root_index, 2]
-            keypoints_z = ((keypoints_3d[:, 2] - root_z) / self.z_max + 1) * (
-                self.input_size[2] / 2)
-            keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
+            root_z = keypoints_3d[:, self.root_index, 2].mean(1)
+            keypoints_z = (
+                (keypoints_3d[..., 2] - root_z) / self.z_max + 1) * (
+                    self.input_size[2] / 2)
+            keypoints = np.concatenate([keypoints, keypoints_z[..., None]],
+                                       axis=-1)
         else:
             root_z = np.array([self.z_max], dtype=np.float32)
 
@@ -153,11 +162,8 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         return encoded
 
-    def decode(
-        self, x: np.ndarray, y: np.ndarray, z: np.ndarray, root_z: np.ndarray
-    ) -> tuple[ndarray, tuple[ndarray | ndarray | Any, ndarray
-                              | ndarray]] | tuple[ndarray, ndarray | ndarray
-                                                  | Any]:
+    def decode(self, x: np.ndarray, y: np.ndarray, z: np.ndarray,
+               root_z: np.ndarray):
         """Decode SimCC labels into 3D keypoints.
 
         Args:
@@ -228,7 +234,7 @@ class SimCC3DLabel(BaseKeypointCodec):
         self,
         keypoints: np.ndarray,
         keypoints_visible: Optional[np.ndarray] = None
-    ) -> tuple[ndarray, ndarray, ndarray, ndarray | ndarray]:
+    ) -> tuple[ndarray, ndarray, ndarray, ndarray]:
         """Encoding keypoints into SimCC labels with Gaussian Label Smoothing
         strategy."""
 
@@ -365,7 +371,7 @@ def get_simcc_maximum(simcc_x: np.ndarray,
         f'Invalid shape {simcc_y.shape}')
     assert simcc_z.ndim == 2 or simcc_z.ndim == 3, (
         f'Invalid shape {simcc_z.shape}')
-    assert simcc_x.ndim == simcc_y.ndim == simcc_z, (
+    assert simcc_x.ndim == simcc_y.ndim == simcc_z.ndim, (
         f'{simcc_x.shape} != {simcc_y.shape} or {simcc_z.shape}')
 
     if simcc_x.ndim == 3:
