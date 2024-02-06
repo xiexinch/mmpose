@@ -227,10 +227,10 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                 pred_instances.keypoints[..., :2] / input_size * input_scale \
                 + input_center - 0.5 * input_scale
             keypoints = pred_instances.keypoints
-            camera_param = gt_instances.camera_param
+            camera_param = gt_instances.camera_params[0]
             if 'R' in camera_param:
                 camera = SimpleCamera(camera_param)
-                keypoints = camera.camera_to_pixel(keypoints)
+                keypoints[..., :2] = camera.camera_to_pixel(keypoints)
             else:
                 fx, fy = camera_param['f']
                 cx, cy = camera_param['c']

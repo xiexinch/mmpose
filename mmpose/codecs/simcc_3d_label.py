@@ -74,7 +74,7 @@ class SimCC3DLabel(BaseKeypointCodec):
         bbox_scale='bbox_scales',
         lifting_target='lifting_target',
         lifting_target_visible='lifting_target_visible',
-        camera_param='camera_param')
+        camera_param='camera_params')
 
     def __init__(
         self,

@@ -208,8 +208,7 @@ class H36MWholeBodyDataset(Human36mDataset):
                             1,
                             'iscrowd':
                             0,
-                            'camera_param':
-                            camera_param,
+                            'camera_param': [camera_param],
                             'img_paths':
                             img_paths,
                             'img_path':
