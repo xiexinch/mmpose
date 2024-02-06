@@ -164,7 +164,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoint_y_labels=y,
             keypoint_z_labels=z,
             root_z=root_z,
-            with_z_labels=with_z_labels,
+            with_z_labels=[with_z_labels],
             keypoint_weights=keypoint_weights)
 
         return encoded

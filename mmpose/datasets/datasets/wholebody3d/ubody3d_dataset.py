@@ -184,13 +184,17 @@ class UBody3dDataset(BaseMocapDataset):
                 f'got {len(_ann_ids)} ')
 
             anns = self.ann_data.loadAnns(_ann_ids)
+            num_anns = len(anns)
             img_ids = []
-            kpts = np.zeros((len(anns), num_keypoints, 2), dtype=np.float32)
-            kpts_3d = np.zeros((len(anns), num_keypoints, 3), dtype=np.float32)
-            keypoints_visible = np.zeros((len(anns), num_keypoints),
+            kpts = np.zeros((num_anns, num_keypoints, 2), dtype=np.float32)
+            kpts_3d = np.zeros((num_anns, num_keypoints, 3), dtype=np.float32)
+            keypoints_visible = np.zeros((num_anns, num_keypoints),
                                          dtype=np.float32)
-            scales = np.zeros((len(anns), 2), dtype=np.float32)
-            centers = np.zeros((len(anns), 2), dtype=np.float32)
+            scales = np.zeros((num_anns, 2), dtype=np.float32)
+            centers = np.zeros((num_anns, 2), dtype=np.float32)
+            bboxes = np.zeros((num_anns, 4), dtype=np.float32)
+            bbox_scores = np.zeros((num_anns, ), dtype=np.float32)
+            bbox_scales = np.zeros((num_anns, 2), dtype=np.float32)
 
             for j, ann in enumerate(anns):
                 img_ids.append(ann['image_id'])
@@ -202,10 +206,15 @@ class UBody3dDataset(BaseMocapDataset):
                     scales[j] = np.array(ann['scale'])
                 if 'center' in ann:
                     centers[j] = np.array(ann['center'])
+                bboxes[j] = np.array(ann['bbox'], dtype=np.float32)
+                bbox_scores[j] = np.array([1], dtype=np.float32)
+                bbox_scales[j] = np.array([1, 1], dtype=np.float32)
 
             imgs = self.ann_data.loadImgs(img_ids)
 
-            img_paths = np.array([img['file_name'] for img in imgs])
+            img_paths = np.array([
+                f'{self.data_root}/images/' + img['file_name'] for img in imgs
+            ])
             factors = np.zeros((kpts_3d.shape[0], ), dtype=np.float32)
 
             target_idx = [-1] if self.causal else [int(self.seq_len // 2)]
@@ -230,13 +239,17 @@ class UBody3dDataset(BaseMocapDataset):
                 'category_id': 1,
                 'iscrowd': 0,
                 'img_paths': list(img_paths),
+                'img_path': img_paths[-1],
                 'img_ids': [img['id'] for img in imgs],
                 'lifting_target': kpts_3d[target_idx],
                 'lifting_target_visible': keypoints_visible[target_idx],
                 'target_img_paths': list(img_paths[target_idx]),
-                'camera_param': cam_param,
+                'camera_param': [cam_param],
                 'factor': factors,
                 'target_idx': target_idx,
+                'bbox': bboxes,
+                'bbox_scales': bbox_scales,
+                'bbox_scores': bbox_scores
             }
 
             instance_list.append(instance_info)

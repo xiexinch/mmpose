@@ -273,13 +273,14 @@ class RTMW3DHead(BaseHead):
             dim=0,
         )
 
-        with_z_labels = batch_data_samples[0].gt_instance_labels.with_z_labels
+        with_z_labels = batch_data_samples[0].gt_instance_labels.with_z_labels[
+            0]
         if with_z_labels:
             pred_simcc = (pred_x, pred_y, pred_z)
             gt_simcc = (gt_x, gt_y, gt_z)
         else:
-            pred_simcc = (pred_x, pred_y)
-            gt_simcc = (gt_x, gt_y)
+            pred_simcc = (pred_x, pred_y, 0 * pred_z)
+            gt_simcc = (gt_x, gt_y, torch.zeros_like(gt_z))
 
         # calculate losses
         losses = dict()
