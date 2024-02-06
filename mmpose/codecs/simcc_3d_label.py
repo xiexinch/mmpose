@@ -65,6 +65,7 @@ class SimCC3DLabel(BaseKeypointCodec):
         keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
+        with_z_labels='with_z_labels',
     )
 
     instance_mapping_table = dict(
@@ -133,18 +134,18 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         if keypoints_3d is not None:
             root_z = keypoints_3d[:, self.root_index, 2].mean(1)
-            # print(root_z)
-            # print(keypoints)
-            # print(keypoints_3d)
             keypoints_z = (
                 (keypoints_3d[..., 2] - root_z) / self.z_max + 1) * (
                     self.input_size[2] / 2)
             keypoints = np.concatenate([keypoints, keypoints_z[..., None]],
                                        axis=-1)
-            # print(keypoints)
-            # raise '321'
+            with_z_labels = True
         else:
             root_z = np.array([self.z_max], dtype=np.float32)
+            keypoints_z = np.zeros((keypoints.shape[0], keypoints.shape[1], 1),
+                                   dtype=np.float32)
+            keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
+            with_z_labels = False
 
         if self.smoothing_type == 'gaussian':
             x, y, z, keypoint_weights = self._generate_gaussian(
@@ -163,6 +164,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoint_y_labels=y,
             keypoint_z_labels=z,
             root_z=root_z,
+            with_z_labels=with_z_labels,
             keypoint_weights=keypoint_weights)
 
         return encoded

@@ -273,8 +273,13 @@ class RTMW3DHead(BaseHead):
             dim=0,
         )
 
-        pred_simcc = (pred_x, pred_y, pred_z)
-        gt_simcc = (gt_x, gt_y, gt_z)
+        with_z_labels = batch_data_samples[0].gt_instance_labels.with_z_labels
+        if with_z_labels:
+            pred_simcc = (pred_x, pred_y, pred_z)
+            gt_simcc = (gt_x, gt_y, gt_z)
+        else:
+            pred_simcc = (pred_x, pred_y)
+            gt_simcc = (gt_x, gt_y)
 
         # calculate losses
         losses = dict()
@@ -338,8 +343,13 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
         - float: Averaged accuracy across all keypoints.
         - int: Number of valid keypoints.
     """
-    pred_x, pred_y, pred_z = output
-    gt_x, gt_y, gt_z = target
+    if len(output) == 3:
+        pred_x, pred_y, pred_z = output
+        gt_x, gt_y, gt_z = target
+    else:
+        pred_x, pred_y = output
+        gt_x, gt_y = target
+        pred_z, gt_z = np.zeros_like(pred_x), np.zeros_like(gt_x)
 
     N, _, Wx = pred_x.shape
     _, _, Wy = pred_y.shape
