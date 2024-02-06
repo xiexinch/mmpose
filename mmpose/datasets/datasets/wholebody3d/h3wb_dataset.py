@@ -133,8 +133,12 @@ class H36MWholeBodyDataset(Human36mDataset):
                         'K': camera_param['K'][0, :2, ...],
                         'R': camera_param['R'][0],
                         'T': camera_param['T'].reshape(3, 1),
-                        'Distortion': camera_param['Distortion'][0]
+                        'Distortion': camera_param['Distortion'][0],
                     }
+                    camera_param['f'] = (camera_param['K'][0, 0] * 1000,
+                                         camera_param['K'][1, 1] * 1000)
+                    camera_param['c'] = (camera_param['K'][0, 2] * 1000,
+                                         camera_param['K'][1, 2] * 1000)
 
                     seq_step = 1
                     _len = (self.seq_len - 1) * seq_step + 1

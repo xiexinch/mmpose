@@ -121,7 +121,7 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         self.root_index = list(root_index) if isinstance(
             root_index, tuple) else [root_index]
-        self.z_max = z_max if z_max is not None else 56.399036
+        self.z_max = z_max if z_max is not None else 5.6302552
 
     def encode(self,
                keypoints: np.ndarray,
@@ -133,11 +133,16 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         if keypoints_3d is not None:
             root_z = keypoints_3d[:, self.root_index, 2].mean(1)
+            # print(root_z)
+            # print(keypoints)
+            # print(keypoints_3d)
             keypoints_z = (
                 (keypoints_3d[..., 2] - root_z) / self.z_max + 1) * (
                     self.input_size[2] / 2)
             keypoints = np.concatenate([keypoints, keypoints_z[..., None]],
                                        axis=-1)
+            # print(keypoints)
+            # raise '321'
         else:
             root_z = np.array([self.z_max], dtype=np.float32)
 

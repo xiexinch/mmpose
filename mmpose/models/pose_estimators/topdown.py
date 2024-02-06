@@ -4,9 +4,8 @@ from typing import Optional
 
 from torch import Tensor
 
-from mmpose.codecs.utils import camera_to_pixel
+from mmpose.codecs.utils import pixel_to_camera
 from mmpose.registry import MODELS
-from mmpose.utils import SimpleCamera
 from mmpose.utils.typing import (ConfigType, InstanceList, OptConfigType,
                                  OptMultiConfig, PixelDataList, SampleList)
 from .base import BasePoseEstimator
@@ -223,18 +222,18 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
             input_scale = data_sample.metainfo['input_scale']
             input_size = data_sample.metainfo['input_size']
 
+            # print(input_center, input_scale, input_size)
+
             pred_instances.keypoints[..., :2] = \
                 pred_instances.keypoints[..., :2] / input_size * input_scale \
                 + input_center - 0.5 * input_scale
             keypoints = pred_instances.keypoints
             camera_param = gt_instances.camera_params[0]
-            if 'R' in camera_param:
-                camera = SimpleCamera(camera_param)
-                keypoints[..., :2] = camera.camera_to_pixel(keypoints)
-            else:
-                fx, fy = camera_param['f']
-                cx, cy = camera_param['c']
-                keypoints[..., :2] = camera_to_pixel(keypoints, fx, fy, cx, cy)
+
+            fx, fy = camera_param['f']
+            cx, cy = camera_param['c']
+            keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
+
             pred_instances.keypoints = keypoints
 
             if 'keypoints_visible' not in pred_instances:
