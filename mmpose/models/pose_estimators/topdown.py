@@ -2,6 +2,7 @@
 from itertools import zip_longest
 from typing import Optional
 
+import numpy as np
 from torch import Tensor
 
 from mmpose.codecs.utils import pixel_to_camera
@@ -190,6 +191,33 @@ class TopdownPoseEstimator(BasePoseEstimator):
 @MODELS.register_module()
 class TopdownPoseEstimator3D(TopdownPoseEstimator):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.camera_param = {
+            'R':
+            np.array([[-0.91536173, 0.05154812, -0.39931903],
+                      [0.40180837, 0.18037357, -0.89778361],
+                      [0.02574754, -0.98224649, -0.18581953]]),
+            'T':
+            np.array([[1.84110703], [4.95528462], [1.5634454]]),
+            'c':
+            np.array([[512.54150496], [515.45148698]]),
+            'f':
+            np.array([[1145.04940459], [1143.78109572]]),
+            'k':
+            np.array([[-0.20709891], [0.24777518], [-0.00307515]]),
+            'p':
+            np.array([[-0.00142447], [-0.0009757]]),
+            'w':
+            1000,
+            'h':
+            1002,
+            'name':
+            'camera1',
+            'id':
+            '54138969'
+        }
+
     def add_pred_to_datasample(self, batch_pred_instances: InstanceList,
                                batch_pred_fields: Optional[PixelDataList],
                                batch_data_samples: SampleList) -> SampleList:
@@ -221,14 +249,14 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
             input_center = data_sample.metainfo['input_center']
             input_scale = data_sample.metainfo['input_scale']
             input_size = data_sample.metainfo['input_size']
-
-            # print(input_center, input_scale, input_size)
-
             pred_instances.keypoints[..., :2] = \
                 pred_instances.keypoints[..., :2] / input_size * input_scale \
                 + input_center - 0.5 * input_scale
             keypoints = pred_instances.keypoints
-            camera_param = gt_instances.camera_params[0]
+            if 'camera_params' in gt_instances:
+                camera_param = gt_instances.camera_params[0]
+            else:
+                camera_param = self.camera_param
 
             fx, fy = camera_param['f']
             cx, cy = camera_param['c']

@@ -567,3 +567,17 @@ class GlobalSkeletonTarget(BaseTransform):
             results['lifting_target'] = results['keypoints_global']
             results['keypoints_3d'] = results['keypoints_global']
         return results
+
+
+@TRANSFORMS.register_module()
+class UpdateInstanceMappingLabel(BaseTransform):
+
+    def __init__(self, keys: Dict):
+        super().__init__()
+        self.keys = keys
+
+    def transform(self, results):
+        instance_mapping_tabel = results.get('instance_mapping_table', dict())
+        instance_mapping_tabel.update(self.keys)
+        results['instance_mapping_table'] = instance_mapping_tabel
+        return results

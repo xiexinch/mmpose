@@ -139,25 +139,33 @@ class SimCC3DLabel(BaseKeypointCodec):
                     self.input_size[2] / 2)
             keypoints = np.concatenate([keypoints, keypoints_z[..., None]],
                                        axis=-1)
+            if self.smoothing_type == 'gaussian':
+                x, y, z, keypoint_weights = self._generate_gaussian(
+                    keypoints, keypoints_visible)
+            elif self.smoothing_type == 'standard':
+                x, y, z, keypoint_weights = self._generate_standard(
+                    keypoints, keypoints_visible)
+            else:
+                raise ValueError(f'{self.__class__.__name__}')
             with_z_labels = True
         else:
-            root_z = np.array([self.z_max], dtype=np.float32)
+            root_z = np.zeros([], dtype=np.float32)
             keypoints_z = np.zeros((keypoints.shape[0], keypoints.shape[1], 1),
                                    dtype=np.float32)
-            keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
+            if keypoints != np.zeors([]):
+                keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
+                if self.smoothing_type == 'gaussian':
+                    x, y, z, keypoint_weights = self._generate_gaussian(
+                        keypoints, keypoints_visible)
+                elif self.smoothing_type == 'standard':
+                    x, y, z, keypoint_weights = self._generate_standard(
+                        keypoints, keypoints_visible)
+                else:
+                    raise ValueError(f'{self.__class__.__name__}')
+            else:
+                x, y, z = np.zeros((3, ))
+                keypoint_weights = None
             with_z_labels = False
-
-        if self.smoothing_type == 'gaussian':
-            x, y, z, keypoint_weights = self._generate_gaussian(
-                keypoints, keypoints_visible)
-        elif self.smoothing_type == 'standard':
-            x, y, z, keypoint_weights = self._generate_standard(
-                keypoints, keypoints_visible)
-        else:
-            raise ValueError(
-                f'{self.__class__.__name__} got invalid `smoothing_type` value'
-                f'{self.smoothing_type}. Should be one of '
-                '{"gaussian", "standard"}')
 
         encoded = dict(
             keypoint_x_labels=x,

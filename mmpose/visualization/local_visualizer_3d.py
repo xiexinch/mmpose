@@ -612,6 +612,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
         pred_img_data = self._draw_3d_data_samples(
             image.copy(),
             data_sample,
+            kpt_thr=kpt_thr,
             draw_gt=draw_gt,
             num_instances=num_instances,
             axis_azimuth=axis_azimuth,

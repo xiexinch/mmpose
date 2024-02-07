@@ -198,9 +198,13 @@ class RTMW3DHead(BaseHead):
                batch_data_samples: OptSampleList) -> InstanceList:
         root_z_list = []
         if batch_data_samples is not None:
-            for data_sample in batch_data_samples:
-                root_z_list.append(data_sample.gt_instances.root_z)
-            root_z = torch.from_numpy(np.stack(root_z_list))
+            if 'root_z' in batch_data_samples[0].gt_instances:
+                for data_sample in batch_data_samples:
+                    root_z_list.append(data_sample.gt_instances.root_z)
+                root_z = torch.from_numpy(np.stack(root_z_list))
+            else:
+                root_z = torch.ones(
+                    x.shape[0], 1, device=x.device, dtype=x.dtype) * 5.6302552
         else:
             root_z = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype)
         return super().decode((x, y, z, root_z))

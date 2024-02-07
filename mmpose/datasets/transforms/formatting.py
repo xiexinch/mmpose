@@ -117,6 +117,7 @@ class PackPoseInputs(BaseTransform):
         # `head_size` is used for computing MpiiPCKAccuracy metric,
         # namely, PCKh
         head_size='head_size',
+        lifting_target='lifting_target',
     )
 
     # items in `field_mapping_table` will be packed into
