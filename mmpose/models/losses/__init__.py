@@ -2,7 +2,7 @@
 from .ae_loss import AssociativeEmbeddingLoss
 from .bbox_loss import IoULoss
 from .classification_loss import (BCELoss, JSDiscretLoss, KLDiscretLoss,
-                                  VariFocalLoss, KLDiscretLoss2)
+                                  KLDiscretLoss2, VariFocalLoss)
 from .fea_dis_loss import FeaLoss
 from .heatmap_loss import (AdaptiveWingLoss, KeypointMSELoss,
                            KeypointOHKMMSELoss, MLECCLoss)

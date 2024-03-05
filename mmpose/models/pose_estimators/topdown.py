@@ -193,8 +193,8 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.camera_param = {
-            'c':[512.54150496, 515.45148698],
-            'f':[1145.04940459, 1143.78109572],
+            'c': [512.54150496, 515.45148698],
+            'f': [1145.04940459, 1143.78109572],
         }
 
     def add_pred_to_datasample(self, batch_pred_instances: InstanceList,
@@ -243,9 +243,14 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                 f = np.array([1145.04940459, 1143.78109572])
                 c = np.array(data_sample.ori_shape)
 
-            kpts_pixel = np.concatenate([keypoints_2d, (keypoints_3d[..., 2] + gt_instances.root_z)[..., None]], axis=-1)
+            kpts_pixel = np.concatenate([
+                keypoints_2d,
+                (keypoints_3d[..., 2] + gt_instances.root_z)[..., None]
+            ],
+                                        axis=-1)
             keypoints_3d = kpts_pixel.copy()
-            keypoints_3d[..., :2] = (kpts_pixel[..., :2] - c) / f * kpts_pixel[..., 2:]
+            keypoints_3d[..., :2] = (kpts_pixel[..., :2] -
+                                     c) / f * kpts_pixel[..., 2:]
             # keypoints_3d[..., 2] -= gt_instances.root_z
             # print(keypoints_3d)
             if mode == '3d':

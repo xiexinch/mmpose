@@ -214,6 +214,7 @@ class KLDiscretLoss(nn.Module):
 
         return loss / K
 
+
 @MODELS.register_module()
 class KLDiscretLoss2(KLDiscretLoss):
 

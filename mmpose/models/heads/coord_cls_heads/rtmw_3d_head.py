@@ -4,11 +4,11 @@ from typing import Optional, Sequence, Tuple, Union
 import numpy as np
 import torch
 from mmcv.cnn import ConvModule
+from mmengine.structures import InstanceData
 from torch import Tensor, nn
 
-from mmengine.structures import InstanceData
-from mmpose.evaluation.functional import keypoint_mpjpe
 from mmpose.codecs.utils import get_simcc_maximum as get_2d_simcc_maximum
+from mmpose.evaluation.functional import keypoint_mpjpe
 from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
 from mmpose.registry import KEYPOINT_CODECS, MODELS
 from mmpose.utils.tensor_utils import to_numpy
@@ -21,7 +21,11 @@ OptIntSeq = Optional[Sequence[int]]
 
 @MODELS.register_module()
 class RootZeroLoss(nn.Module):
-    def __init__(self, target_root: int, root_index: Union[int, list], weight: float = 1.):
+
+    def __init__(self,
+                 target_root: int,
+                 root_index: Union[int, list],
+                 weight: float = 1.):
         super().__init__()
         if isinstance(root_index, int):
             root_index = [root_index]
@@ -29,11 +33,13 @@ class RootZeroLoss(nn.Module):
         self.weight = weight
         self.target_root = target_root
         self.name = 'loss_root'
-    
+
     def forward(self, pred_coords, gt_coords, keypoint_weights):
         _, _, pred_z = pred_coords
         target_z = torch.nn.functional.one_hot(
-            torch.tensor([self.target_root], device=pred_z.device), num_classes=self.target_root*2).repeat(pred_z.shape[0], 1).to(pred_z)
+            torch.tensor([self.target_root], device=pred_z.device),
+            num_classes=self.target_root * 2).repeat(pred_z.shape[0],
+                                                     1).to(pred_z)
         pred_z = pred_z[..., self.root_index, :].mean(1).softmax(-1)
         loss = torch.nn.functional.binary_cross_entropy(pred_z, target_z)
         return loss
@@ -108,12 +114,12 @@ class RTMW3DHead(BaseHead):
             self.loss_module = MODELS.build(loss)
         elif isinstance(loss, (list, tuple)):
             self.loss_module = nn.ModuleList()
-            for l in loss:
-                self.loss_module.append(MODELS.build(l))
+            for cfg in loss:
+                self.loss_module.append(MODELS.build(cfg))
         else:
             raise TypeError(f'loss_decode must be a dict or sequence of dict,\
                 but got {type(loss)}')
-        
+
         if decoder is not None:
             self.decoder = KEYPOINT_CODECS.build(decoder)
         else:
@@ -249,21 +255,25 @@ class RTMW3DHead(BaseHead):
                 'Please set the decoder configs in the init parameters to '
                 'enable head methods `head.predict()` and `head.decode()`')
 
-
         batch_output_np = to_numpy(batch_outputs, unzip=True)
         batch_keypoints = []
         batch_keypoints2d = []
         batch_scores = []
         for outputs in batch_output_np:
-            keypoints_2d, keypoints, scores = _pack_and_call(outputs,
-                                               self.decoder.decode)
+            keypoints_2d, keypoints, scores = _pack_and_call(
+                outputs, self.decoder.decode)
             batch_keypoints2d.append(keypoints_2d)
             batch_keypoints.append(keypoints)
             batch_scores.append(scores)
 
         preds = []
-        for keypoints_2d, keypoints, scores in zip(batch_keypoints2d, batch_keypoints, batch_scores):
-            pred = InstanceData(keypoints_2d=keypoints_2d, keypoints=keypoints, keypoint_scores=scores)
+        for keypoints_2d, keypoints, scores in zip(batch_keypoints2d,
+                                                   batch_keypoints,
+                                                   batch_scores):
+            pred = InstanceData(
+                keypoints_2d=keypoints_2d,
+                keypoints=keypoints,
+                keypoint_scores=scores)
             preds.append(pred)
 
         return preds
@@ -337,10 +347,7 @@ class RTMW3DHead(BaseHead):
         )
 
         weight_z = torch.cat(
-            [
-                d.gt_instance_labels.weight_z
-                for d in batch_data_samples
-            ],
+            [d.gt_instance_labels.weight_z for d in batch_data_samples],
             dim=0,
         )
 
@@ -348,10 +355,9 @@ class RTMW3DHead(BaseHead):
         keypoint_weights_ = keypoint_weights.clone()
         pred_simcc = (pred_x, pred_y, pred_z)
         gt_simcc = (gt_x, gt_y, gt_z)
-    
+
         keypoint_weights = torch.cat([
-            keypoint_weights[None, ...],
-            keypoint_weights[None, ...],
+            keypoint_weights[None, ...], keypoint_weights[None, ...],
             weight_z[None, ...]
         ])
 
@@ -421,13 +427,13 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
         gt_x, gt_y, gt_z = target
         pred_coords, _ = get_simcc_maximum(pred_x, pred_y, pred_z)
         gt_coords, _ = get_simcc_maximum(gt_x, gt_y, gt_z)
-        
+
     else:
         pred_x, pred_y = output
         gt_x, gt_y = target
         pred_coords, _ = get_2d_simcc_maximum(pred_x, pred_y)
         gt_coords, _ = get_2d_simcc_maximum(gt_x, gt_y)
-    
+
     pred_coords /= simcc_split_ratio
     gt_coords /= simcc_split_ratio
 

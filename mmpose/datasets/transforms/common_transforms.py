@@ -958,7 +958,7 @@ class GenerateTarget(BaseTransform):
             raise ValueError(
                 'GenerateTarget requires \'transformed_keypoints\' or'
                 ' \'keypoints\' in the results.')
-        
+
         if results.get('keypoints_3d', None) is None:
             results['keypoints_3d'] = None
 

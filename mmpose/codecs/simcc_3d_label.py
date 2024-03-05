@@ -1,16 +1,16 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import warnings
 from itertools import product
 from typing import Any, Optional, Tuple, Union
 
 import numpy as np
 from numpy import ndarray
 
-from mmpose.codecs.utils.refinement import refine_simcc_dark
 from mmpose.registry import KEYPOINT_CODECS
-from .utils import camera_to_pixel
 from .base import BaseKeypointCodec
-import warnings
-warnings.filterwarnings("error", category=RuntimeWarning, module=__name__)
+
+warnings.filterwarnings('error', category=RuntimeWarning, module=__name__)
+
 
 @KEYPOINT_CODECS.register_module()
 class SimCC3DLabel(BaseKeypointCodec):
@@ -67,8 +67,7 @@ class SimCC3DLabel(BaseKeypointCodec):
         keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
-        weight_z='weight_z'
-    )
+        weight_z='weight_z')
 
     instance_mapping_table = dict(
         bbox='bboxes',
@@ -79,21 +78,19 @@ class SimCC3DLabel(BaseKeypointCodec):
         camera_param='camera_params',
         root_z='root_z')
 
-    def __init__(
-        self,
-        input_size: Tuple[int, int, int],
-        smoothing_type: str = 'gaussian',
-        sigma: Union[float, int, Tuple[float]] = 6.0,
-        simcc_split_ratio: float = 2.0,
-        label_smooth_weight: float = 0.0,
-        normalize: bool = True,
-        use_dark: bool = False,
-        decode_visibility: bool = False,
-        decode_beta: float = 150.0,
-        root_index: Union[int, Tuple[int]] = 0,
-        z_range: Optional[int] = None,
-        sigmoid_z: bool = False
-    ) -> None:
+    def __init__(self,
+                 input_size: Tuple[int, int, int],
+                 smoothing_type: str = 'gaussian',
+                 sigma: Union[float, int, Tuple[float]] = 6.0,
+                 simcc_split_ratio: float = 2.0,
+                 label_smooth_weight: float = 0.0,
+                 normalize: bool = True,
+                 use_dark: bool = False,
+                 decode_visibility: bool = False,
+                 decode_beta: float = 150.0,
+                 root_index: Union[int, Tuple[int]] = 0,
+                 z_range: Optional[int] = None,
+                 sigmoid_z: bool = False) -> None:
         super().__init__()
 
         self.input_size = input_size
@@ -143,26 +140,29 @@ class SimCC3DLabel(BaseKeypointCodec):
             root_z = keypoints_3d[..., self.root_index, 2].mean(1)
             keypoints_3d[..., 2] -= root_z
             if self.sigmoid_z:
-                keypoints_z = (1 / (1 + np.exp(-(3 * keypoints_3d[..., 2])))) * self.input_size[2]
+                keypoints_z = (1 / (1 + np.exp(-(3 * keypoints_3d[..., 2])))
+                               ) * self.input_size[2]
             else:
-                keypoints_z = (keypoints_3d[..., 2] / self.z_range + 1) * (self.input_size[2] / 2)
-            
+                keypoints_z = (keypoints_3d[..., 2] / self.z_range + 1) * (
+                    self.input_size[2] / 2)
+
             keypoints_3d = np.concatenate([keypoints, keypoints_z[..., None]],
-                                       axis=-1)
+                                          axis=-1)
             x, y, z, keypoint_weights = self._generate_gaussian(
                 keypoints_3d, keypoints_visible)
             weight_z = keypoint_weights
         else:
             if keypoints.shape != np.zeros([]).shape:
-                keypoints_z = np.random.rand(keypoints.shape[0], keypoints.shape[1], 1)
+                keypoints_z = np.random.rand(keypoints.shape[0],
+                                             keypoints.shape[1], 1)
                 keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
                 x, y, z, keypoint_weights = self._generate_gaussian(
                     keypoints, keypoints_visible)
             else:
                 x, y, z = np.zeros((3, 1), dtype=np.float32)
-                keypoint_weights = np.ones((1,))  
+                keypoint_weights = np.ones((1, ))
             weight_z = np.zeros_like(keypoint_weights)
-        
+
         encoded = dict(
             keypoint_x_labels=x,
             keypoint_y_labels=y,
@@ -200,11 +200,13 @@ class SimCC3DLabel(BaseKeypointCodec):
         keypoints_z = keypoints[..., 2:3]
         if self.sigmoid_z:
             keypoints_z /= self.input_size[2]
-            keypoints_z[keypoints_z <=0] = 1e-8
-            scores[(keypoints_z <=0).squeeze(-1)] = 0
+            keypoints_z[keypoints_z <= 0] = 1e-8
+            scores[(keypoints_z <= 0).squeeze(-1)] = 0
             keypoints[..., 2:3] = np.log(keypoints_z / (1 - keypoints_z)) / 3
         else:
-            keypoints[..., 2:3] = (keypoints_z / (self.input_size[-1] / 2) - 1) * self.z_range
+            keypoints[...,
+                      2:3] = (keypoints_z /
+                              (self.input_size[-1] / 2) - 1) * self.z_range
         return keypoints_2d, keypoints, scores
 
     def _map_coordinates(
