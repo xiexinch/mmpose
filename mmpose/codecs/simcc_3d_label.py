@@ -7,8 +7,10 @@ from numpy import ndarray
 
 from mmpose.codecs.utils.refinement import refine_simcc_dark
 from mmpose.registry import KEYPOINT_CODECS
+from .utils import camera_to_pixel
 from .base import BaseKeypointCodec
-
+import warnings
+warnings.filterwarnings("error", category=RuntimeWarning, module=__name__)
 
 @KEYPOINT_CODECS.register_module()
 class SimCC3DLabel(BaseKeypointCodec):
@@ -65,17 +67,17 @@ class SimCC3DLabel(BaseKeypointCodec):
         keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
-        with_z_labels='with_z_labels',
+        weight_z='weight_z'
     )
 
     instance_mapping_table = dict(
-        root_z='root_z',
         bbox='bboxes',
         bbox_score='bbox_scores',
         bbox_scale='bbox_scales',
         lifting_target='lifting_target',
         lifting_target_visible='lifting_target_visible',
-        camera_param='camera_params')
+        camera_param='camera_params',
+        root_z='root_z')
 
     def __init__(
         self,
@@ -89,7 +91,8 @@ class SimCC3DLabel(BaseKeypointCodec):
         decode_visibility: bool = False,
         decode_beta: float = 150.0,
         root_index: Union[int, Tuple[int]] = 0,
-        z_max: Optional[int] = None,
+        z_range: Optional[int] = None,
+        sigmoid_z: bool = False
     ) -> None:
         super().__init__()
 
@@ -122,7 +125,9 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         self.root_index = list(root_index) if isinstance(
             root_index, tuple) else [root_index]
-        self.z_max = z_max if z_max is not None else 5.6302552
+        self.z_range = z_range if z_range is not None else 2.1744869
+        self.sigmoid_z = sigmoid_z
+        self.root_z = [5.14388]
 
     def encode(self,
                keypoints: np.ndarray,
@@ -131,54 +136,45 @@ class SimCC3DLabel(BaseKeypointCodec):
 
         if keypoints_visible is None:
             keypoints_visible = np.ones(keypoints.shape[:2], dtype=np.float32)
-
+        lifting_target = [None]
+        root_z = self.root_z
         if keypoints_3d is not None:
-            root_z = keypoints_3d[:, self.root_index, 2].mean(1)
-            keypoints_z = (
-                (keypoints_3d[..., 2] - root_z) / self.z_max + 1) * (
-                    self.input_size[2] / 2)
-            keypoints = np.concatenate([keypoints, keypoints_z[..., None]],
+            lifting_target = keypoints_3d.copy()
+            root_z = keypoints_3d[..., self.root_index, 2].mean(1)
+            keypoints_3d[..., 2] -= root_z
+            if self.sigmoid_z:
+                keypoints_z = (1 / (1 + np.exp(-(3 * keypoints_3d[..., 2])))) * self.input_size[2]
+            else:
+                keypoints_z = (keypoints_3d[..., 2] / self.z_range + 1) * (self.input_size[2] / 2)
+            
+            keypoints_3d = np.concatenate([keypoints, keypoints_z[..., None]],
                                        axis=-1)
-            if self.smoothing_type == 'gaussian':
+            x, y, z, keypoint_weights = self._generate_gaussian(
+                keypoints_3d, keypoints_visible)
+            weight_z = keypoint_weights
+        else:
+            if keypoints.shape != np.zeros([]).shape:
+                keypoints_z = np.random.rand(keypoints.shape[0], keypoints.shape[1], 1)
+                keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
                 x, y, z, keypoint_weights = self._generate_gaussian(
                     keypoints, keypoints_visible)
-            elif self.smoothing_type == 'standard':
-                x, y, z, keypoint_weights = self._generate_standard(
-                    keypoints, keypoints_visible)
             else:
-                raise ValueError(f'{self.__class__.__name__}')
-            with_z_labels = True
-        else:
-            root_z = np.zeros([], dtype=np.float32)
-            keypoints_z = np.zeros((keypoints.shape[0], keypoints.shape[1], 1),
-                                   dtype=np.float32)
-            if keypoints != np.zeors([]):
-                keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
-                if self.smoothing_type == 'gaussian':
-                    x, y, z, keypoint_weights = self._generate_gaussian(
-                        keypoints, keypoints_visible)
-                elif self.smoothing_type == 'standard':
-                    x, y, z, keypoint_weights = self._generate_standard(
-                        keypoints, keypoints_visible)
-                else:
-                    raise ValueError(f'{self.__class__.__name__}')
-            else:
-                x, y, z = np.zeros((3, ))
-                keypoint_weights = None
-            with_z_labels = False
-
+                x, y, z = np.zeros((3, 1), dtype=np.float32)
+                keypoint_weights = np.ones((1,))  
+            weight_z = np.zeros_like(keypoint_weights)
+        
         encoded = dict(
             keypoint_x_labels=x,
             keypoint_y_labels=y,
             keypoint_z_labels=z,
+            lifting_target=lifting_target,
             root_z=root_z,
-            with_z_labels=[with_z_labels],
-            keypoint_weights=keypoint_weights)
+            keypoint_weights=keypoint_weights,
+            weight_z=weight_z)
 
         return encoded
 
-    def decode(self, x: np.ndarray, y: np.ndarray, z: np.ndarray,
-               root_z: np.ndarray):
+    def decode(self, x: np.ndarray, y: np.ndarray, z: np.ndarray):
         """Decode SimCC labels into 3D keypoints.
 
         Args:
@@ -199,37 +195,17 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoints = keypoints[None, :]
             scores = scores[None, :]
 
-        if self.use_dark:
-            x_blur = int((self.sigma[0] * 20 - 7) // 3)
-            y_blur = int((self.sigma[1] * 20 - 7) // 3)
-            z_blur = int((self.simga[2] * 20 - 7) // 3)
-            x_blur -= int((x_blur % 2) == 0)
-            y_blur -= int((y_blur % 2) == 0)
-            z_blur -= int((z_blur % 2) == 0)
-            keypoints[:, :, 0] = refine_simcc_dark(keypoints[:, :, 0], x,
-                                                   x_blur)
-            keypoints[:, :, 1] = refine_simcc_dark(keypoints[:, :, 1], y,
-                                                   y_blur)
-            keypoints[:, :, 2] = refine_simcc_dark(keypoints[:, :, 2], z,
-                                                   z_blur)
-
         keypoints /= self.simcc_split_ratio
-
+        keypoints_2d = keypoints[..., :2]
         keypoints_z = keypoints[..., 2:3]
-        keypoints_z = (keypoints_z /
-                       (self.input_size[-1] / 2) - 1) * self.z_max + root_z
-        keypoints = np.concatenate([keypoints[..., :2], keypoints_z], axis=-1)
-
-        if self.decode_visibility:
-            encoded = dict(
-                simcc_x=x * self.decode_beta * self.sigma[0],
-                simcc_y=y * self.decode_beta * self.sigma[1],
-                simcc_z=z * self.decode_beta * self.sigma[2],
-            )
-            _, visibility = get_simcc_maximum(encoded, apply_softmax=True)
-            return keypoints, (scores, visibility)
+        if self.sigmoid_z:
+            keypoints_z /= self.input_size[2]
+            keypoints_z[keypoints_z <=0] = 1e-8
+            scores[(keypoints_z <=0).squeeze(-1)] = 0
+            keypoints[..., 2:3] = np.log(keypoints_z / (1 - keypoints_z)) / 3
         else:
-            return keypoints, scores
+            keypoints[..., 2:3] = (keypoints_z / (self.input_size[-1] / 2) - 1) * self.z_range
+        return keypoints_2d, keypoints, scores
 
     def _map_coordinates(
         self,

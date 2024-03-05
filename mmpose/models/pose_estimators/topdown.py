@@ -5,7 +5,6 @@ from typing import Optional
 import numpy as np
 from torch import Tensor
 
-from mmpose.codecs.utils import pixel_to_camera
 from mmpose.registry import MODELS
 from mmpose.utils.typing import (ConfigType, InstanceList, OptConfigType,
                                  OptMultiConfig, PixelDataList, SampleList)
@@ -194,28 +193,8 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.camera_param = {
-            'R':
-            np.array([[-0.91536173, 0.05154812, -0.39931903],
-                      [0.40180837, 0.18037357, -0.89778361],
-                      [0.02574754, -0.98224649, -0.18581953]]),
-            'T':
-            np.array([[1.84110703], [4.95528462], [1.5634454]]),
-            'c':
-            np.array([[512.54150496], [515.45148698]]),
-            'f':
-            np.array([[1145.04940459], [1143.78109572]]),
-            'k':
-            np.array([[-0.20709891], [0.24777518], [-0.00307515]]),
-            'p':
-            np.array([[-0.00142447], [-0.0009757]]),
-            'w':
-            1000,
-            'h':
-            1002,
-            'name':
-            'camera1',
-            'id':
-            '54138969'
+            'c':[512.54150496, 515.45148698],
+            'f':[1145.04940459, 1143.78109572],
         }
 
     def add_pred_to_datasample(self, batch_pred_instances: InstanceList,
@@ -239,7 +218,8 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
             batch_pred_fields = []
         output_keypoint_indices = self.test_cfg.get('output_keypoint_indices',
                                                     None)
-
+        mode = self.test_cfg.get('mode', '3d')
+        assert mode in ['2d', '3d']
         for pred_instances, pred_fields, data_sample in zip_longest(
                 batch_pred_instances, batch_pred_fields, batch_data_samples):
 
@@ -249,20 +229,31 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
             input_center = data_sample.metainfo['input_center']
             input_scale = data_sample.metainfo['input_scale']
             input_size = data_sample.metainfo['input_size']
-            pred_instances.keypoints[..., :2] = \
-                pred_instances.keypoints[..., :2] / input_size * input_scale \
+            keypoints_3d = pred_instances.keypoints
+            keypoints_2d = pred_instances.keypoints_2d
+            keypoints_2d = keypoints_2d / input_size * input_scale \
                 + input_center - 0.5 * input_scale
-            keypoints = pred_instances.keypoints
-            if 'camera_params' in gt_instances:
-                camera_param = gt_instances.camera_params[0]
+
+            if gt_instances.get('camera_params', None) is not None:
+                camera_params = gt_instances.camera_params[0]
+                f = np.array(camera_params['f'])
+                c = np.array(camera_params['c'])
             else:
-                camera_param = self.camera_param
+                # f = np.array([1000, 1000])
+                f = np.array([1145.04940459, 1143.78109572])
+                c = np.array(data_sample.ori_shape)
 
-            fx, fy = camera_param['f']
-            cx, cy = camera_param['c']
-            keypoints = pixel_to_camera(keypoints, fx, fy, cx, cy)
-
-            pred_instances.keypoints = keypoints
+            kpts_pixel = np.concatenate([keypoints_2d, (keypoints_3d[..., 2] + gt_instances.root_z)[..., None]], axis=-1)
+            keypoints_3d = kpts_pixel.copy()
+            keypoints_3d[..., :2] = (kpts_pixel[..., :2] - c) / f * kpts_pixel[..., 2:]
+            # keypoints_3d[..., 2] -= gt_instances.root_z
+            # print(keypoints_3d)
+            if mode == '3d':
+                pred_instances.keypoints = keypoints_3d
+                pred_instances.transformed_keypoints = keypoints_2d
+            else:
+                pred_instances.keypoints = keypoints_2d
+                pred_instances.transformed_keypoints = keypoints_2d
 
             if 'keypoints_visible' not in pred_instances:
                 pred_instances.keypoints_visible = \

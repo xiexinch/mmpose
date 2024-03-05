@@ -958,6 +958,9 @@ class GenerateTarget(BaseTransform):
             raise ValueError(
                 'GenerateTarget requires \'transformed_keypoints\' or'
                 ' \'keypoints\' in the results.')
+        
+        if results.get('keypoints_3d', None) is None:
+            results['keypoints_3d'] = None
 
         keypoints_visible = results['keypoints_visible']
         if keypoints_visible.ndim == 3 and keypoints_visible.shape[2] == 2:

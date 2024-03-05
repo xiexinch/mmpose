@@ -2,7 +2,7 @@
 from .ae_loss import AssociativeEmbeddingLoss
 from .bbox_loss import IoULoss
 from .classification_loss import (BCELoss, JSDiscretLoss, KLDiscretLoss,
-                                  VariFocalLoss)
+                                  VariFocalLoss, KLDiscretLoss2)
 from .fea_dis_loss import FeaLoss
 from .heatmap_loss import (AdaptiveWingLoss, KeypointMSELoss,
                            KeypointOHKMMSELoss, MLECCLoss)
@@ -20,5 +20,5 @@ __all__ = [
     'KLDiscretLoss', 'MultipleLossWrapper', 'JSDiscretLoss', 'CombinedLoss',
     'AssociativeEmbeddingLoss', 'SoftWeightSmoothL1Loss',
     'MPJPEVelocityJointLoss', 'FeaLoss', 'KDLoss', 'OKSLoss', 'IoULoss',
-    'VariFocalLoss', 'MLECCLoss'
+    'VariFocalLoss', 'MLECCLoss', 'KLDiscretLoss2'
 ]

@@ -214,6 +214,28 @@ class KLDiscretLoss(nn.Module):
 
         return loss / K
 
+@MODELS.register_module()
+class KLDiscretLoss2(KLDiscretLoss):
+
+    def forward(self, pred_simcc, gt_simcc, target_weight):
+        N, K, _ = pred_simcc[0].shape
+        loss = 0
+
+        for pred, target, weight in zip(pred_simcc, gt_simcc, target_weight):
+            pred = pred.reshape(-1, pred.size(-1))
+            target = target.reshape(-1, target.size(-1))
+            weight = weight.reshape(-1)
+
+            t_loss = self.criterion(pred, target).mul(weight)
+
+            if self.mask is not None:
+                t_loss = t_loss.reshape(N, K)
+                t_loss[:, self.mask] = t_loss[:, self.mask] * self.mask_weight
+
+            loss = loss + t_loss.sum()
+
+        return loss / K
+
 
 @MODELS.register_module()
 class InfoNCELoss(nn.Module):

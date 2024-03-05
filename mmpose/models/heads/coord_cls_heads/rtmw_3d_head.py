@@ -6,7 +6,9 @@ import torch
 from mmcv.cnn import ConvModule
 from torch import Tensor, nn
 
+from mmengine.structures import InstanceData
 from mmpose.evaluation.functional import keypoint_mpjpe
+from mmpose.codecs.utils import get_simcc_maximum as get_2d_simcc_maximum
 from mmpose.models.utils.rtmcc_block import RTMCCBlock, ScaleNorm
 from mmpose.registry import KEYPOINT_CODECS, MODELS
 from mmpose.utils.tensor_utils import to_numpy
@@ -15,6 +17,26 @@ from mmpose.utils.typing import (ConfigType, InstanceList, OptConfigType,
 from ..base_head import BaseHead
 
 OptIntSeq = Optional[Sequence[int]]
+
+
+@MODELS.register_module()
+class RootZeroLoss(nn.Module):
+    def __init__(self, target_root: int, root_index: Union[int, list], weight: float = 1.):
+        super().__init__()
+        if isinstance(root_index, int):
+            root_index = [root_index]
+        self.root_index = root_index
+        self.weight = weight
+        self.target_root = target_root
+        self.name = 'loss_root'
+    
+    def forward(self, pred_coords, gt_coords, keypoint_weights):
+        _, _, pred_z = pred_coords
+        target_z = torch.nn.functional.one_hot(
+            torch.tensor([self.target_root], device=pred_z.device), num_classes=self.target_root*2).repeat(pred_z.shape[0], 1).to(pred_z)
+        pred_z = pred_z[..., self.root_index, :].mean(1).softmax(-1)
+        loss = torch.nn.functional.binary_cross_entropy(pred_z, target_z)
+        return loss
 
 
 @MODELS.register_module()
@@ -82,7 +104,16 @@ class RTMW3DHead(BaseHead):
         self.in_featuremap_size = in_featuremap_size
         self.simcc_split_ratio = simcc_split_ratio
 
-        self.loss_module = MODELS.build(loss)
+        if isinstance(loss, dict):
+            self.loss_module = MODELS.build(loss)
+        elif isinstance(loss, (list, tuple)):
+            self.loss_module = nn.ModuleList()
+            for l in loss:
+                self.loss_module.append(MODELS.build(l))
+        else:
+            raise TypeError(f'loss_decode must be a dict or sequence of dict,\
+                but got {type(loss)}')
+        
         if decoder is not None:
             self.decoder = KEYPOINT_CODECS.build(decoder)
         else:
@@ -194,20 +225,48 @@ class RTMW3DHead(BaseHead):
 
         return pred_x, pred_y, pred_z
 
-    def decode(self, x: Tensor, y: Tensor, z: Tensor,
-               batch_data_samples: OptSampleList) -> InstanceList:
-        root_z_list = []
-        if batch_data_samples is not None:
-            if 'root_z' in batch_data_samples[0].gt_instances:
-                for data_sample in batch_data_samples:
-                    root_z_list.append(data_sample.gt_instances.root_z)
-                root_z = torch.from_numpy(np.stack(root_z_list))
-            else:
-                root_z = torch.ones(
-                    x.shape[0], 1, device=x.device, dtype=x.dtype) * 5.6302552
-        else:
-            root_z = torch.zeros(x.shape[0], 1, device=x.device, dtype=x.dtype)
-        return super().decode((x, y, z, root_z))
+    def decode(self, batch_outputs: Union[Tensor,
+                                          Tuple[Tensor]]) -> InstanceList:
+        """Decode keypoints from outputs.
+
+        Args:
+            batch_outputs (Tensor | Tuple[Tensor]): The network outputs of
+                a data batch
+
+        Returns:
+            List[InstanceData]: A list of InstanceData, each contains the
+            decoded pose information of the instances of one data sample.
+        """
+
+        def _pack_and_call(args, func):
+            if not isinstance(args, tuple):
+                args = (args, )
+            return func(*args)
+
+        if self.decoder is None:
+            raise RuntimeError(
+                f'The decoder has not been set in {self.__class__.__name__}. '
+                'Please set the decoder configs in the init parameters to '
+                'enable head methods `head.predict()` and `head.decode()`')
+
+
+        batch_output_np = to_numpy(batch_outputs, unzip=True)
+        batch_keypoints = []
+        batch_keypoints2d = []
+        batch_scores = []
+        for outputs in batch_output_np:
+            keypoints_2d, keypoints, scores = _pack_and_call(outputs,
+                                               self.decoder.decode)
+            batch_keypoints2d.append(keypoints_2d)
+            batch_keypoints.append(keypoints)
+            batch_scores.append(scores)
+
+        preds = []
+        for keypoints_2d, keypoints, scores in zip(batch_keypoints2d, batch_keypoints, batch_scores):
+            pred = InstanceData(keypoints_2d=keypoints_2d, keypoints=keypoints, keypoint_scores=scores)
+            preds.append(pred)
+
+        return preds
 
     def predict(
         self,
@@ -240,7 +299,7 @@ class RTMW3DHead(BaseHead):
         """
         x, y, z = self.forward(feats)
 
-        preds = self.decode(x, y, z, batch_data_samples)
+        preds = self.decode((x, y, z))
 
         if test_cfg.get('output_heatmaps', False):
             raise NotImplementedError
@@ -277,27 +336,37 @@ class RTMW3DHead(BaseHead):
             dim=0,
         )
 
-        with_z_labels = batch_data_samples[0].gt_instance_labels.with_z_labels[
-            0]
-        if with_z_labels:
-            pred_simcc = (pred_x, pred_y, pred_z)
-            gt_simcc = (gt_x, gt_y, gt_z)
-        else:
-            pred_simcc = (pred_x, pred_y, 0 * pred_z)
-            gt_simcc = (gt_x, gt_y, torch.zeros_like(gt_z))
+        weight_z = torch.cat(
+            [
+                d.gt_instance_labels.weight_z
+                for d in batch_data_samples
+            ],
+            dim=0,
+        )
+
+        N, K, _ = pred_x.shape
+        keypoint_weights_ = keypoint_weights.clone()
+        pred_simcc = (pred_x, pred_y, pred_z)
+        gt_simcc = (gt_x, gt_y, gt_z)
+    
+        keypoint_weights = torch.cat([
+            keypoint_weights[None, ...],
+            keypoint_weights[None, ...],
+            weight_z[None, ...]
+        ])
 
         # calculate losses
         losses = dict()
-        loss = self.loss_module(pred_simcc, gt_simcc, keypoint_weights)
-
-        losses.update(loss_kpt=loss)
+        for i, loss_ in enumerate(self.loss_module):
+            loss = loss_(pred_simcc, gt_simcc, keypoint_weights)
+            losses[f'loss_{i}'] = loss
 
         # calculate accuracy
         error = simcc_mpjpe(
             output=to_numpy(pred_simcc),
             target=to_numpy(gt_simcc),
             simcc_split_ratio=self.simcc_split_ratio,
-            mask=to_numpy(keypoint_weights) > 0,
+            mask=to_numpy(keypoint_weights_) > 0,
         )
 
         mpjpe = torch.tensor(error, device=gt_x.device)
@@ -319,8 +388,7 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
                 target: Tuple[np.ndarray, np.ndarray, np.ndarray],
                 simcc_split_ratio: float,
                 mask: np.ndarray,
-                thr: float = 0.05,
-                normalize: Optional[np.ndarray] = None) -> float:
+                thr: float = 0.05) -> float:
     """Calculate the pose accuracy of PCK for each individual keypoint and the
     averaged accuracy across all keypoints from 3D SimCC.
 
@@ -351,23 +419,16 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
     if len(output) == 3:
         pred_x, pred_y, pred_z = output
         gt_x, gt_y, gt_z = target
+        pred_coords, _ = get_simcc_maximum(pred_x, pred_y, pred_z)
+        gt_coords, _ = get_simcc_maximum(gt_x, gt_y, gt_z)
+        
     else:
         pred_x, pred_y = output
         gt_x, gt_y = target
-        pred_z, gt_z = np.zeros_like(pred_x), np.zeros_like(gt_x)
-
-    N, _, Wx = pred_x.shape
-    _, _, Wy = pred_y.shape
-    _, _, Wz = pred_z.shape
-    W, H, D = int(Wx / simcc_split_ratio), int(Wy / simcc_split_ratio), int(
-        Wz / simcc_split_ratio)
-
-    if normalize is None:
-        normalize = np.tile(np.array([[H, W, D]]), (N, 1))
-
-    pred_coords, _ = get_simcc_maximum(pred_x, pred_y, pred_z)
+        pred_coords, _ = get_2d_simcc_maximum(pred_x, pred_y)
+        gt_coords, _ = get_2d_simcc_maximum(gt_x, gt_y)
+    
     pred_coords /= simcc_split_ratio
-    gt_coords, _ = get_simcc_maximum(gt_x, gt_y, gt_z)
     gt_coords /= simcc_split_ratio
 
     return keypoint_mpjpe(pred_coords, gt_coords, mask)
