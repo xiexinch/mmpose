@@ -218,6 +218,10 @@ class KLDiscretLoss(nn.Module):
 @MODELS.register_module()
 class KLDiscretLoss2(KLDiscretLoss):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._loss_name = 'loss_kld'
+
     def forward(self, pred_simcc, gt_simcc, target_weight):
         N, K, _ = pred_simcc[0].shape
         loss = 0
@@ -236,6 +240,15 @@ class KLDiscretLoss2(KLDiscretLoss):
             loss = loss + t_loss.sum()
 
         return loss / K
+
+    @property
+    def loss_name(self):
+        """Loss Name.
+
+        Returns:
+            str: The name of this loss item.
+        """
+        return self._loss_name
 
 
 @MODELS.register_module()

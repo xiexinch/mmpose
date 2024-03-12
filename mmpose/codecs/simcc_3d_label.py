@@ -67,7 +67,8 @@ class SimCC3DLabel(BaseKeypointCodec):
         keypoint_y_labels='keypoint_y_labels',
         keypoint_z_labels='keypoint_z_labels',
         keypoint_weights='keypoint_weights',
-        weight_z='weight_z')
+        weight_z='weight_z',
+        with_z_label='with_z_label')
 
     instance_mapping_table = dict(
         bbox='bboxes',
@@ -135,6 +136,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoints_visible = np.ones(keypoints.shape[:2], dtype=np.float32)
         lifting_target = [None]
         root_z = self.root_z
+        with_z_label = False
         if keypoints_3d is not None:
             lifting_target = keypoints_3d.copy()
             root_z = keypoints_3d[..., self.root_index, 2].mean(1)
@@ -151,6 +153,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             x, y, z, keypoint_weights = self._generate_gaussian(
                 keypoints_3d, keypoints_visible)
             weight_z = keypoint_weights
+            with_z_label = True
         else:
             if keypoints.shape != np.zeros([]).shape:
                 keypoints_z = np.random.rand(keypoints.shape[0],
@@ -162,6 +165,7 @@ class SimCC3DLabel(BaseKeypointCodec):
                 x, y, z = np.zeros((3, 1), dtype=np.float32)
                 keypoint_weights = np.ones((1, ))
             weight_z = np.zeros_like(keypoint_weights)
+            with_z_label = False
 
         encoded = dict(
             keypoint_x_labels=x,
@@ -170,7 +174,8 @@ class SimCC3DLabel(BaseKeypointCodec):
             lifting_target=lifting_target,
             root_z=root_z,
             keypoint_weights=keypoint_weights,
-            weight_z=weight_z)
+            weight_z=weight_z,
+            with_z_label=[with_z_label])
 
         return encoded
 

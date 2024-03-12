@@ -219,7 +219,7 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
         output_keypoint_indices = self.test_cfg.get('output_keypoint_indices',
                                                     None)
         mode = self.test_cfg.get('mode', '3d')
-        assert mode in ['2d', '3d']
+        assert mode in ['2d', '3d', 'vis']
         for pred_instances, pred_fields, data_sample in zip_longest(
                 batch_pred_instances, batch_pred_fields, batch_data_samples):
 
@@ -239,7 +239,6 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                 f = np.array(camera_params['f'])
                 c = np.array(camera_params['c'])
             else:
-                # f = np.array([1000, 1000])
                 f = np.array([1145.04940459, 1143.78109572])
                 c = np.array(data_sample.ori_shape)
 
@@ -248,12 +247,13 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                 (keypoints_3d[..., 2] + gt_instances.root_z)[..., None]
             ],
                                         axis=-1)
-            keypoints_3d = kpts_pixel.copy()
-            keypoints_3d[..., :2] = (kpts_pixel[..., :2] -
-                                     c) / f * kpts_pixel[..., 2:]
-            # keypoints_3d[..., 2] -= gt_instances.root_z
-            # print(keypoints_3d)
+            kpts_cam = kpts_pixel.copy()
+            kpts_cam[..., :2] = (kpts_pixel[..., :2] - c) / f * kpts_pixel[...,
+                                                                           2:]
             if mode == '3d':
+                pred_instances.keypoints = kpts_cam
+                pred_instances.transformed_keypoints = keypoints_2d
+            elif mode == 'vis':
                 pred_instances.keypoints = keypoints_3d
                 pred_instances.transformed_keypoints = keypoints_2d
             else:

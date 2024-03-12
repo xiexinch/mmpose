@@ -110,10 +110,10 @@ class RTMW3DHead(BaseHead):
         self.in_featuremap_size = in_featuremap_size
         self.simcc_split_ratio = simcc_split_ratio
 
+        self.loss_module = nn.ModuleList()
         if isinstance(loss, dict):
-            self.loss_module = MODELS.build(loss)
+            self.loss_module.append(MODELS.build(loss))
         elif isinstance(loss, (list, tuple)):
-            self.loss_module = nn.ModuleList()
             for cfg in loss:
                 self.loss_module.append(MODELS.build(cfg))
         else:
@@ -351,6 +351,10 @@ class RTMW3DHead(BaseHead):
             dim=0,
         )
 
+        with_z_labels = [
+            d.gt_instance_labels.with_z_label[0] for d in batch_data_samples
+        ]
+
         N, K, _ = pred_x.shape
         keypoint_weights_ = keypoint_weights.clone()
         pred_simcc = (pred_x, pred_y, pred_z)
@@ -364,8 +368,14 @@ class RTMW3DHead(BaseHead):
         # calculate losses
         losses = dict()
         for i, loss_ in enumerate(self.loss_module):
-            loss = loss_(pred_simcc, gt_simcc, keypoint_weights)
-            losses[f'loss_{i}'] = loss
+            if loss_.loss_name == 'loss_bone':
+                pred_coords = get_3d_coord(pred_x, pred_y, pred_z,
+                                           with_z_labels)
+                gt_coords = get_3d_coord(gt_x, gt_y, gt_z, with_z_labels)
+                loss = loss_(pred_coords, gt_coords, keypoint_weights_)
+            else:
+                loss = loss_(pred_simcc, gt_simcc, keypoint_weights)
+            losses[loss_.loss_name] = loss
 
         # calculate accuracy
         error = simcc_mpjpe(
@@ -440,42 +450,24 @@ def simcc_mpjpe(output: Tuple[np.ndarray, np.ndarray, np.ndarray],
     return keypoint_mpjpe(pred_coords, gt_coords, mask)
 
 
+def get_3d_coord(simcc_x, simcc_y, simcc_z, with_z_labels):
+    N, K, W = simcc_x.shape
+    # 过滤 z 轴
+    for i, with_z in enumerate(with_z_labels):
+        if not with_z:
+            simcc_z[i] = torch.zeros_like(simcc_z[i])
+    x_locs = simcc_x.reshape(N * K, -1).argmax(dim=1)
+    y_locs = simcc_y.reshape(N * K, -1).argmax(dim=1)
+    z_locs = simcc_z.reshape(N * K, -1).argmax(dim=1)
+
+    locs = torch.stack((x_locs, y_locs, z_locs),
+                       dim=-1).to(simcc_x).reshape(N, K, 3)
+    return locs
+
+
 def get_simcc_maximum(simcc_x: np.ndarray, simcc_y: np.ndarray,
                       simcc_z: np.ndarray
                       ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Get maximum response location and value from simcc representations.
-
-    Note:
-        instance number: N
-        num_keypoints: K
-        heatmap height: H
-        heatmap width: W
-
-    Args:
-        simcc_x (np.ndarray): x-axis SimCC in shape (K, Wx) or (N, K, Wx)
-        simcc_y (np.ndarray): y-axis SimCC in shape (K, Wy) or (N, K, Wy)
-        simcc_z (np.ndarray): z-axis SimCC in shape (K, Wz) or (N, K, Wz)
-
-    Returns:
-        tuple:
-        - locs (np.ndarray): locations of maximum heatmap responses in shape
-            (K, 3) or (N, K, 3)
-        - vals (np.ndarray): values of maximum heatmap responses in shape
-            (K,) or (N, K)
-    """
-
-    assert isinstance(simcc_x, np.ndarray), ('simcc_x should be numpy.ndarray')
-    assert isinstance(simcc_y, np.ndarray), ('simcc_y should be numpy.ndarray')
-    assert isinstance(simcc_z, np.ndarray), ('simcc_z should be numpy.ndarray')
-    assert simcc_x.ndim == 2 or simcc_x.ndim == 3, (
-        f'Invalid shape {simcc_x.shape}')
-    assert simcc_y.ndim == 2 or simcc_y.ndim == 3, (
-        f'Invalid shape {simcc_y.shape}')
-    assert simcc_z.ndim == 2 or simcc_z.ndim == 3, (
-        f'Invalid shape {simcc_z.shape}')
-    assert simcc_x.ndim == simcc_y.ndim == simcc_z.ndim, (
-        f'{simcc_x.shape} != {simcc_y.shape} != {simcc_z.ndim} ')
-
     if simcc_x.ndim == 3:
         N, K, Wx = simcc_x.shape
         simcc_x = simcc_x.reshape(N * K, -1)

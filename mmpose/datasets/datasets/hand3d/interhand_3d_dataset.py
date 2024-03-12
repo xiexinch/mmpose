@@ -129,7 +129,8 @@ class InterHand3DDataset(BaseCocoStyleDataset):
                  pipeline: List[Union[dict, Callable]] = [],
                  test_mode: bool = False,
                  lazy_init: bool = False,
-                 max_refetch: int = 1000):
+                 max_refetch: int = 1000,
+                 sample_interval: int = 1):
 
         _ann_file = ann_file
         if not is_abs(_ann_file):
@@ -172,7 +173,8 @@ class InterHand3DDataset(BaseCocoStyleDataset):
             pipeline=pipeline,
             test_mode=test_mode,
             lazy_init=lazy_init,
-            max_refetch=max_refetch)
+            max_refetch=max_refetch,
+            sample_interval=sample_interval)
 
     def _load_annotations(self) -> Tuple[List[dict], List[dict]]:
         """Load data from annotations in COCO format."""
@@ -198,6 +200,8 @@ class InterHand3DDataset(BaseCocoStyleDataset):
         image_list = []
 
         for idx, img_id in enumerate(self.coco.getImgIds()):
+            if idx % self.sample_interval != 0:
+                continue
             img = self.coco.loadImgs(img_id)[0]
             img.update({
                 'img_id':

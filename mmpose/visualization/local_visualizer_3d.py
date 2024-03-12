@@ -185,12 +185,12 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                     ax.set_title(f'{title} ({idx})')
                 ax.dist = axis_dist
 
-                # x_c = np.mean(kpts_valid[:, 0]) if valid.any() else 0
-                # y_c = np.mean(kpts_valid[:, 1]) if valid.any() else 0
-                # z_c = np.mean(kpts_valid[:, 2]) if valid.any() else 0
+                x_c = np.mean(kpts_valid[:, 0]) if valid.any() else 0
+                y_c = np.mean(kpts_valid[:, 1]) if valid.any() else 0
+                z_c = np.mean(kpts_valid[:, 2]) if valid.any() else 0
 
                 ax.set_xlim3d([x_c - axis_limit / 2, x_c + axis_limit / 2])
-                ax.set_ylim3d([y_c - axis_limit / 2, y_c + axis_limit / 2])
+                ax.set_ylim3d([y_c - 1.7 / 2, y_c + 1.7 / 2])
                 ax.set_zlim3d(
                     [min(0, z_c - axis_limit / 2), z_c + axis_limit / 2])
 
