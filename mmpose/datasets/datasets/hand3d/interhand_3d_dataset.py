@@ -222,6 +222,7 @@ class InterHand3DDataset(BaseCocoStyleDataset):
                 continue
 
             instance_list.append(instance_info)
+        del self.coco
         return instance_list, image_list
 
     def parse_data_info(self, raw_data_info: dict) -> Optional[dict]:
