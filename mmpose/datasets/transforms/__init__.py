@@ -6,7 +6,8 @@ from .common_transforms import (Albumentation, FilterAnnotations,
                                 GenerateTarget, GetBBoxCenterScale,
                                 PhotometricDistortion, RandomBBoxTransform,
                                 RandomFlip, RandomHalfBody, YOLOXHSVRandomAug)
-from .converting import KeypointConverter, SingleHandConverter
+from .converting import (KeypointCombiner, KeypointConverter,
+                         SingleHandConverter)
 from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
 from .loading import LoadImage
@@ -30,5 +31,5 @@ __all__ = [
     'SingleHandConverter', 'GlobalSkeletonTarget',
     'CoordCorrectionAndRandomRotate', 'RandomHalfBody3D', 'RandomDropInput',
     'RandomPerturbScoreBalance', 'RandomPerturb2DKeypoints',
-    'UpdateInstanceMappingLabel'
+    'UpdateInstanceMappingLabel', 'KeypointCombiner'
 ]
