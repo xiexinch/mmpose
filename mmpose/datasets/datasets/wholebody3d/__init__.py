@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+from .dna_rendering_dataset import DNARenderingDataset
 from .gta_human import GTAHumanDataset
 from .h3wb_dataset import H36MWholeBodyDataset
 from .mpii_3d_dataset import MPII3DWBDataset
@@ -7,5 +8,5 @@ from .ubody3d_dataset import UBody3dDataset
 
 __all__ = [
     'UBody3dDataset', 'H36MWholeBodyDataset', 'MPII3DWBDataset',
-    'MPII3DHPWBDataset', 'GTAHumanDataset'
+    'MPII3DHPWBDataset', 'GTAHumanDataset', 'DNARenderingDataset'
 ]

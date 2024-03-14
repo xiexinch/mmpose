@@ -86,7 +86,15 @@ class RTMCC3DHead(BaseHead):
         self.in_featuremap_size = in_featuremap_size
         self.simcc_split_ratio = simcc_split_ratio
 
-        self.loss_module = MODELS.build(loss)
+        self.loss_module = nn.ModuleList()
+        if isinstance(loss, dict):
+            self.loss_module.append(MODELS.build(loss))
+        elif isinstance(loss, (list, tuple)):
+            for cfg in loss:
+                self.loss_module.append(MODELS.build(cfg))
+        else:
+            raise TypeError(f'loss_decode must be a dict or sequence of dict,\
+                but got {type(loss)}')
         if decoder is not None:
             self.decoder = KEYPOINT_CODECS.build(decoder)
         else:
