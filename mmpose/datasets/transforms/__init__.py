@@ -17,7 +17,8 @@ from .pose3d_transforms import (CoordCorrectionAndRandomRotate,
                                 RandomFlipAroundRoot, RandomHalfBody3D,
                                 RandomPerturb2DKeypoints,
                                 RandomPerturbScoreBalance,
-                                UpdateInstanceMappingLabel)
+                                UpdateInstanceMappingLabel,
+                                GetBBoxFromMask)
 from .topdown_transforms import TopdownAffine
 
 __all__ = [
@@ -31,5 +32,5 @@ __all__ = [
     'SingleHandConverter', 'GlobalSkeletonTarget',
     'CoordCorrectionAndRandomRotate', 'RandomHalfBody3D', 'RandomDropInput',
     'RandomPerturbScoreBalance', 'RandomPerturb2DKeypoints',
-    'UpdateInstanceMappingLabel', 'KeypointCombiner'
+    'UpdateInstanceMappingLabel', 'KeypointCombiner', 'GetBBoxFromMask'
 ]

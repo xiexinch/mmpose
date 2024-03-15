@@ -2,6 +2,7 @@
 from copy import deepcopy
 from typing import Dict, List, Optional, Tuple
 
+import cv2
 import numpy as np
 from mmcv.transforms import BaseTransform
 from mmcv.transforms.utils import cache_randomness
@@ -580,4 +581,23 @@ class UpdateInstanceMappingLabel(BaseTransform):
         instance_mapping_tabel = results.get('instance_mapping_table', dict())
         instance_mapping_tabel.update(self.keys)
         results['instance_mapping_table'] = instance_mapping_tabel
+        return results
+
+
+@TRANSFORMS.register_module()
+class GetBBoxFromMask(BaseTransform):
+
+    def transform(self, results):
+
+        mask = results['mask']
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                    cv2.CHAIN_APPROX_SIMPLE)
+        if len(contours) == 0:
+            return np.array([0, 0, 0, 0], dtype=np.float32)
+        x, y, w, h = cv2.boundingRect(contours[0])
+        bbox = np.array([x, y, x + w, y + h], dtype=np.float32)[None, :]
+
+        results['bbox'] = bbox
+        results['bbox_score'] = np.ones((1,))
+
         return results
