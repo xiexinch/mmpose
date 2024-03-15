@@ -137,7 +137,7 @@ class DNARenderingDataset(BaseMocapDataset):
             kpts_3d_cam = kpts_3d_cam[..., :3]
 
             mask_bytes = anns['Mask'][str(int(cam_id))]['mask'][frame_id][()]
-            mask = np.max(cv2.imdecode(mask_bytes, cv2.IMREAD_COLOR), 2)
+            # mask = np.max(cv2.imdecode(mask_bytes, cv2.IMREAD_COLOR), 2)
             # bbox = get_bbox_from_mask(mask)
 
             instance_info = {
@@ -148,7 +148,7 @@ class DNARenderingDataset(BaseMocapDataset):
                 'lifting_target': kpts_3d_cam,
                 'lifting_target_visible': kpts_visible,
                 'camera_param': cam_param,
-                'mask': mask
+                'mask': mask_bytes
             }
             instance_list.append(instance_info)
 

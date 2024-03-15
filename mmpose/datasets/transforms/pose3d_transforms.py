@@ -590,6 +590,7 @@ class GetBBoxFromMask(BaseTransform):
     def transform(self, results):
 
         mask = results['mask']
+        mask = np.max(cv2.imdecode(mask, cv2.IMREAD_COLOR), 2)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                     cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
@@ -599,5 +600,6 @@ class GetBBoxFromMask(BaseTransform):
 
         results['bbox'] = bbox
         results['bbox_score'] = np.ones((1,))
-
+        # delete mask for saving memory
+        results.pop('mask')
         return results
