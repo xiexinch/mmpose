@@ -1,39 +1,18 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import asyncio
-import logging
-import os
-import os.path as osp
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
-import cv2
-import h5py
 import numpy as np
+from mmengine import ProgressBar
+from mmengine.fileio import get_local_path
 
-from mmengine import ProgressBar, print_log
 from mmpose.datasets.datasets import BaseMocapDataset
 from mmpose.registry import DATASETS
 
 
-def get_bbox_from_mask(mask: np.ndarray) -> np.ndarray:
-    """
-    Args:
-        mask (np.ndarray): mask of the object, shape (H, W)
-
-    Returns:
-        bbox (np.ndarray): bounding box of the object, shape (1, 4),
-            (x1, y1, x2, y2)
-    """
-    mask = mask.astype(np.uint8)
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                   cv2.CHAIN_APPROX_SIMPLE)
-    if len(contours) == 0:
-        return np.array([0, 0, 0, 0], dtype=np.float32)
-    x, y, w, h = cv2.boundingRect(contours[0])
-    return np.array([x, y, x + w, y + h], dtype=np.float32)[None, :]
-
-
 @DATASETS.register_module()
 class DNARenderingDataset(BaseMocapDataset):
+
+    METAINFO: dict = dict(from_file='configs/_base_/datasets/h3wb.py')
 
     def __init__(self,
                  ann_file: str = '',
@@ -41,7 +20,6 @@ class DNARenderingDataset(BaseMocapDataset):
                  multiple_target: int = 0,
                  causal: bool = True,
                  subset_frac: float = 1.0,
-                 camera_param_file: Optional[str] = None,
                  data_mode: str = 'topdown',
                  metainfo: Optional[dict] = None,
                  data_root: Optional[str] = None,
@@ -53,25 +31,8 @@ class DNARenderingDataset(BaseMocapDataset):
                  test_mode: bool = False,
                  lazy_init: bool = False,
                  max_refetch: int = 1000):
-        self.data_root = data_root
-        if data_mode not in {'topdown', 'bottomup'}:
-            raise ValueError(
-                f'{self.__class__.__name__} got invalid data_mode: '
-                f'{data_mode}. Should be "topdown" or "bottomup".')
-        self.data_mode = data_mode
-
-        self._load_ann_file('')
-
-        self.seq_len = 1
-        self.causal = causal
-
-        assert 0 < subset_frac <= 1, (
-            f'Unsupported `subset_frac` {subset_frac}. Supported range '
-            'is (0, 1].')
-        self.subset_frac = subset_frac
-
-        self.sequence_indices = self.get_sequence_indices()
-
+        self.hand_roots = [9, 10, 91, 112]
+        self.data_mode = 'topdown'
         super().__init__(
             ann_file=ann_file,
             metainfo=metainfo,
@@ -83,87 +44,73 @@ class DNARenderingDataset(BaseMocapDataset):
             pipeline=pipeline,
             test_mode=test_mode,
             lazy_init=lazy_init,
-            max_refetch=max_refetch)
+            max_refetch=max_refetch,
+            subset_frac=subset_frac)
 
     def _load_ann_file(self, ann_file: str) -> dict:
-        anno_files = os.listdir(osp.join(self.data_root, 'annotations'))
-        ann_data = dict()
-        img_data = dict()
-
-        for file in anno_files:
-            path = osp.join(self.data_root, 'annotations', file)
-            ann_data[file.replace('_annots.smc', '')] = h5py.File(path, 'r')
-        self.ann_data = ann_data
-
-        for key in ann_data.keys():
-            file_path = osp.join(self.data_root, 'main', f'{key}.smc')
-            img_data[key] = h5py.File(file_path, 'r')
-        self.img_data = img_data
+        with get_local_path(ann_file) as local_path:
+            ann = np.load(local_path, allow_pickle=True)
+        self.ann_data = ann['data'][()]
 
     def get_sequence_indices(self) -> List[List[int]]:
         assert self.seq_len == 1, 'Sequence length must be 1 for COCO dataset'
         return []
-    
-    def load_data_list(self) -> List[dict]:
-        asyncio.run(self._load_annotations())
-        return self.data_list
 
-    async def _load_annotations(self) -> Tuple[List[dict], List[dict]]:
-
+    def _load_annotations(self) -> Tuple[List[dict], List[dict]]:
         instance_list = []
-        
-        async def _async_create_instance(self, frame_id: str, cam_id: str, cam_group: str, imgs:dict, anns:dict):
-            img_bytes = imgs[cam_group][cam_id]['color'][frame_id][()]
-            if len(cam_id) == 1:
-                cam_id = '0' + cam_id
-            kpts_2d = anns['Keypoints_2D'][cam_id][int(frame_id)][None, ..., :2].astype(np.float32)
-            kpts_3d_full = anns['Keypoints_3D']['keypoints3d']
-            keypoints_3d_mask = anns['Keypoints_3D']['keypoints3d_mask'][()].astype(bool)
-            kpts_3d_full = kpts_3d_full[:, keypoints_3d_mask, :]
+        image_list = []
 
-            kpts_3d_global = kpts_3d_full[int(frame_id)][None, ...].astype(np.float32)
-            kpts_3d = kpts_3d_global[..., :3]
-            kpts_visible = kpts_3d_global[..., 3]
-            
-            cam_param = {
-                'RT': anns['Camera_Parameter'][cam_id]['RT'][()].astype(np.float32),
-                'K': anns['Camera_Parameter'][cam_id]['K'][()].astype(np.float32),
-                'D': anns['Camera_Parameter'][cam_id]['D'][()].astype(np.float32)
-            }
-            cam_param['R'] = np.linalg.inv(cam_param['RT'])
+        instance_id = 0
+        length = len(self.ann_data.keys())
+        sub_length = int(length * self.subset_frac)
+        step = length // sub_length
 
-            kpts_3d = np.concatenate([kpts_3d, np.ones((kpts_3d.shape[0], kpts_3d.shape[1], 1))], axis=-1)
-            kpts_3d_cam = kpts_3d @ cam_param['R']
-            kpts_3d_cam = kpts_3d_cam[..., :3]
+        print(
+            f'Loading {self.subset_frac * 100}% DNA Rendering annotations.....'
+        )
+        progress_bar = ProgressBar(sub_length)
+        for idx, (_, ann) in enumerate(self.ann_data.items()):
+            if idx % step != 0:
+                continue
+            kpts = ann['keypoints']
+            kpts_3d = ann['keypoints_3d']
+            kpts_visible = ann['keypoints_visible']
+            l_wrist_id, r_wrist_id, l_hand_root_id, r_hand_root_id =\
+                self.hand_roots
+            kpts = self._concnat_hand_roots(kpts, l_wrist_id, r_wrist_id,
+                                            l_hand_root_id, r_hand_root_id)
+            kpts_3d = self._concnat_hand_roots(kpts_3d, l_wrist_id, r_wrist_id,
+                                               l_hand_root_id, r_hand_root_id)
+            kpts_visible = self._concnat_hand_roots(kpts_visible[..., None],
+                                                    l_wrist_id, r_wrist_id,
+                                                    l_hand_root_id,
+                                                    r_hand_root_id).squeeze(-1)
 
-            mask_bytes = anns['Mask'][str(int(cam_id))]['mask'][frame_id][()]
-            # mask = np.max(cv2.imdecode(mask_bytes, cv2.IMREAD_COLOR), 2)
-            # bbox = get_bbox_from_mask(mask)
-
-            instance_info = {
-                'img': img_bytes,
-                'keypoints': kpts_2d,
-                'keypoints_3d': kpts_3d_cam,
+            instance = {
+                'img_path': ann['img'],
+                'keypoints': kpts,
+                'keypoints_3d': kpts_3d,
                 'keypoints_visible': kpts_visible,
-                'lifting_target': kpts_3d_cam,
+                'lifting_target': kpts_3d,
                 'lifting_target_visible': kpts_visible,
-                'camera_param': cam_param,
-                'mask': mask_bytes
+                'id': instance_id,
+                'bbox_score': np.ones((1, ), dtype=np.float32),
+                'bbox': ann['bbox'],
             }
-            instance_list.append(instance_info)
-
-        progress_bar = ProgressBar(len(self.ann_data.keys()))
-        for key in self.ann_data.keys():
-            anns = self.ann_data[key]
-            imgs = self.img_data[key]
-
-            cam_groups = imgs.keys()
-            for cam_group in cam_groups:
-                cam_ids = imgs[cam_group].keys()
-                for cam_id in cam_ids:
-                    frame_ids = imgs[cam_group][cam_id]['color'].keys()
-                    tasks = [_async_create_instance(self, frame_id, cam_id, cam_group, imgs, anns) for frame_id in frame_ids]
-                    await asyncio.gather(*tasks)
+            instance_list.append(instance)
+            instance_id += 1
             progress_bar.update()
-        self.data_list = instance_list
-        print_log(f'Loaded {len(instance_list)} samples', logger='current', level=logging.INFO)
+        del self.ann_data
+        return instance_list, image_list
+
+    def _concnat_hand_roots(self, kpts, left_wrist_id, right_wrist_id,
+                            left_hand_root_id, right_hand_root_id):
+        left_wrist = kpts[..., left_wrist_id, :].copy()
+        right_wrist = kpts[..., right_wrist_id, :].copy()
+        kpts = np.concatenate([
+            kpts[:, :left_hand_root_id, :], left_wrist[None, :],
+            kpts[:, left_hand_root_id:right_hand_root_id, :],
+            right_wrist[None, :], kpts[:, right_hand_root_id:, :]
+        ],
+                              axis=1)
+        return kpts
