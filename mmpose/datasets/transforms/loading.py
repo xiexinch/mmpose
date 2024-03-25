@@ -1,8 +1,9 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from typing import Optional
 
+import cv2
 import numpy as np
-from mmcv.transforms import LoadImageFromFile
+from mmcv.transforms import BaseTransform, LoadImageFromFile
 
 from mmpose.registry import TRANSFORMS
 
@@ -67,5 +68,43 @@ class LoadImage(LoadImageFromFile):
                 f'`{str(e)}` occurs when loading `{results["img_path"]}`.'
                 'Please check whether the file exists.')
             raise e
+
+        return results
+
+
+@TRANSFORMS.register_module()
+class LoadImageFromOSS2(BaseTransform):
+
+    def __init__(self, endpoint: str, ak: str, sk: str, bucket_name: str,
+                 **kwargs):
+        super().__init__(**kwargs)
+        self.endpoint = endpoint
+        self.ak = ak
+        self.sk = sk
+        self.bucket_name = bucket_name
+
+    def transform(self, results: dict) -> Optional[dict]:
+        """The transform function of :class:`LoadImage`.
+
+        Args:
+            results (dict): The result dict
+
+        Returns:
+            dict: The result dict.
+        """
+
+        try:
+            import oss2
+            auth = oss2.Auth(self.ak, self.sk)
+            bucket = oss2.Bucket(auth, self.endpoint, self.bucket_name)
+            img_path = results['img_path']
+            img = bucket.get_object(img_path).read()
+            img = np.frombuffer(img, np.uint8)
+            img = cv2.imdecode(img, cv2.IMREAD_COLOR)
+            results['img'] = img
+            results['img_shape'] = img.shape[:2]
+            results['ori_shape'] = img.shape[:2]
+        except ImportError:
+            raise ImportError('Please install oss2 to load image from oss')
 
         return results

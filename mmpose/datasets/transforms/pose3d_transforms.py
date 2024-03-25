@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os.path as osp
 from copy import deepcopy
 from typing import Dict, List, Optional, Tuple
 
@@ -6,6 +7,7 @@ import cv2
 import numpy as np
 from mmcv.transforms import BaseTransform
 from mmcv.transforms.utils import cache_randomness
+from mmengine.utils import scandir
 
 from mmpose.registry import TRANSFORMS
 from mmpose.structures.keypoint import flip_keypoints_custom_center
@@ -592,14 +594,45 @@ class GetBBoxFromMask(BaseTransform):
         mask = results['mask']
         mask = np.max(cv2.imdecode(mask, cv2.IMREAD_COLOR), 2)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                    cv2.CHAIN_APPROX_SIMPLE)
+                                       cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) == 0:
             return np.array([0, 0, 0, 0], dtype=np.float32)
         x, y, w, h = cv2.boundingRect(contours[0])
         bbox = np.array([x, y, x + w, y + h], dtype=np.float32)[None, :]
 
         results['bbox'] = bbox
-        results['bbox_score'] = np.ones((1,))
+        results['bbox_score'] = np.ones((1, ))
         # delete mask for saving memory
         results.pop('mask')
+        return results
+
+
+@TRANSFORMS.register_module()
+class RandomBackground(BaseTransform):
+
+    def __init__(self, bg_dir: str, bg_prob: float = 0.5):
+        self.bg_dir = bg_dir
+        self.bg_prob = bg_prob
+
+        images = list(scandir(bg_dir, suffix=['.jpg', '.png']))
+        self.image_paths = [osp.join(bg_dir, img) for img in images]
+
+    def transform(self, results: Dict) -> Dict | Tuple[List, List] | None:
+        assert 'mask' in results, 'mask is required for RandomBackground'
+
+        if np.random.rand() > self.bg_prob:
+            return results
+
+        mask = cv2.imread(results['mask'], cv2.IMREAD_GRAYSCALE)
+        bg_path = np.random.choice(self.image_paths)
+        bg_img = cv2.imread(bg_path)
+        bg_img = cv2.resize(bg_img, (mask.shape[1], mask.shape[0]))
+
+        img = results['img']
+
+        mask = mask[..., None] / 255
+        img = img * (1 - mask) + bg_img * mask
+
+        results['img'] = img
+
         return results

@@ -10,15 +10,15 @@ from .converting import (KeypointCombiner, KeypointConverter,
                          SingleHandConverter)
 from .formatting import PackPoseInputs
 from .hand_transforms import HandRandomFlip
-from .loading import LoadImage
+from .loading import LoadImage, LoadImageFromOSS2
 from .mix_img_transforms import Mosaic, YOLOXMixUp
 from .pose3d_transforms import (CoordCorrectionAndRandomRotate,
-                                GlobalSkeletonTarget, RandomDropInput,
+                                GetBBoxFromMask, GlobalSkeletonTarget,
+                                RandomBackground, RandomDropInput,
                                 RandomFlipAroundRoot, RandomHalfBody3D,
                                 RandomPerturb2DKeypoints,
                                 RandomPerturbScoreBalance,
-                                UpdateInstanceMappingLabel,
-                                GetBBoxFromMask)
+                                UpdateInstanceMappingLabel)
 from .topdown_transforms import TopdownAffine
 
 __all__ = [
@@ -32,5 +32,6 @@ __all__ = [
     'SingleHandConverter', 'GlobalSkeletonTarget',
     'CoordCorrectionAndRandomRotate', 'RandomHalfBody3D', 'RandomDropInput',
     'RandomPerturbScoreBalance', 'RandomPerturb2DKeypoints',
-    'UpdateInstanceMappingLabel', 'KeypointCombiner', 'GetBBoxFromMask'
+    'UpdateInstanceMappingLabel', 'KeypointCombiner', 'GetBBoxFromMask',
+    'RandomBackground', 'LoadImageFromOSS2'
 ]

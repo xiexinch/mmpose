@@ -2,7 +2,6 @@
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
-from mmengine import ProgressBar
 from mmengine.fileio import get_local_path
 
 from mmpose.datasets.datasets import BaseMocapDataset
@@ -50,7 +49,7 @@ class DNARenderingDataset(BaseMocapDataset):
     def _load_ann_file(self, ann_file: str) -> dict:
         with get_local_path(ann_file) as local_path:
             ann = np.load(local_path, allow_pickle=True)
-        self.ann_data = ann['data'][()]
+        self.ann_data = ann['instances']
 
     def get_sequence_indices(self) -> List[List[int]]:
         assert self.seq_len == 1, 'Sequence length must be 1 for COCO dataset'
@@ -61,45 +60,30 @@ class DNARenderingDataset(BaseMocapDataset):
         image_list = []
 
         instance_id = 0
-        length = len(self.ann_data.keys())
+        length = len(self.ann_data)
         sub_length = int(length * self.subset_frac)
         step = length // sub_length
 
         print(
             f'Loading {self.subset_frac * 100}% DNA Rendering annotations.....'
         )
-        progress_bar = ProgressBar(sub_length)
-        for idx, (_, ann) in enumerate(self.ann_data.items()):
+        for idx, ann in enumerate(self.ann_data):
             if idx % step != 0:
                 continue
-            kpts = ann['keypoints']
-            kpts_3d = ann['keypoints_3d']
-            kpts_visible = ann['keypoints_visible']
-            l_wrist_id, r_wrist_id, l_hand_root_id, r_hand_root_id =\
-                self.hand_roots
-            kpts = self._concnat_hand_roots(kpts, l_wrist_id, r_wrist_id,
-                                            l_hand_root_id, r_hand_root_id)
-            kpts_3d = self._concnat_hand_roots(kpts_3d, l_wrist_id, r_wrist_id,
-                                               l_hand_root_id, r_hand_root_id)
-            kpts_visible = self._concnat_hand_roots(kpts_visible[..., None],
-                                                    l_wrist_id, r_wrist_id,
-                                                    l_hand_root_id,
-                                                    r_hand_root_id).squeeze(-1)
 
-            instance = {
-                'img_path': ann['img'],
-                'keypoints': kpts,
-                'keypoints_3d': kpts_3d,
-                'keypoints_visible': kpts_visible,
-                'lifting_target': kpts_3d,
-                'lifting_target_visible': kpts_visible,
-                'id': instance_id,
-                'bbox_score': np.ones((1, ), dtype=np.float32),
+            instance_info = {
+                'img_path': ann['img_path'],
+                'keypoints': ann['keypoints'],
+                'keypoints_3d': ann['keypoints_3d'],
+                'keypoints_visible': ann['keypoints_visible'],
                 'bbox': ann['bbox'],
+                'bbox_score': ann['bbox_score'],
+                'cam_param': [ann['camera_param']]
             }
-            instance_list.append(instance)
+
+            instance_list.append(instance_info)
             instance_id += 1
-            progress_bar.update()
+
         del self.ann_data
         return instance_list, image_list
 

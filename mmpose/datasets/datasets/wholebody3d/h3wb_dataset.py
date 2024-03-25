@@ -234,5 +234,5 @@ class H36MWholeBodyDataset(Human36mDataset):
                                 image_list.append(img_info)
 
                         instance_id += 1
-
+        del self.ann_data
         return instance_list, image_list
