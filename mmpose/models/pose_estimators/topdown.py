@@ -219,7 +219,7 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
         output_keypoint_indices = self.test_cfg.get('output_keypoint_indices',
                                                     None)
         mode = self.test_cfg.get('mode', '3d')
-        assert mode in ['2d', '3d', 'vis']
+        assert mode in ['2d', '3d', 'vis', 'simcc']
         for pred_instances, pred_fields, data_sample in zip_longest(
                 batch_pred_instances, batch_pred_fields, batch_data_samples):
 
@@ -231,6 +231,7 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
             input_size = data_sample.metainfo['input_size']
             keypoints_3d = pred_instances.keypoints
             keypoints_2d = pred_instances.keypoints_2d
+            keypoints_simcc = pred_instances.keypoints_simcc
             keypoints_2d = keypoints_2d / input_size * input_scale \
                 + input_center - 0.5 * input_scale
 
@@ -255,6 +256,9 @@ class TopdownPoseEstimator3D(TopdownPoseEstimator):
                 pred_instances.transformed_keypoints = keypoints_2d
             elif mode == 'vis':
                 pred_instances.keypoints = keypoints_3d
+                pred_instances.transformed_keypoints = keypoints_2d
+            elif mode == 'simcc':
+                pred_instances.keypoints = keypoints_simcc
                 pred_instances.transformed_keypoints = keypoints_2d
             else:
                 pred_instances.keypoints = keypoints_2d

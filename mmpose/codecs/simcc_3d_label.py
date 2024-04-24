@@ -156,8 +156,8 @@ class SimCC3DLabel(BaseKeypointCodec):
             with_z_label = True
         else:
             if keypoints.shape != np.zeros([]).shape:
-                keypoints_z = np.random.rand(keypoints.shape[0],
-                                             keypoints.shape[1], 1)
+                keypoints_z = np.ones((keypoints.shape[0],
+                                             keypoints.shape[1], 1), dtype=np.float32)
                 keypoints = np.concatenate([keypoints, keypoints_z], axis=-1)
                 x, y, z, keypoint_weights = self._generate_gaussian(
                     keypoints, keypoints_visible)
@@ -201,6 +201,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             scores = scores[None, :]
 
         keypoints /= self.simcc_split_ratio
+        keypoints_simcc = keypoints.copy()
         keypoints_2d = keypoints[..., :2]
         keypoints_z = keypoints[..., 2:3]
         if self.sigmoid_z:
@@ -212,7 +213,7 @@ class SimCC3DLabel(BaseKeypointCodec):
             keypoints[...,
                       2:3] = (keypoints_z /
                               (self.input_size[-1] / 2) - 1) * self.z_range
-        return keypoints_2d, keypoints, scores
+        return keypoints_2d, keypoints, keypoints_simcc, scores
 
     def _map_coordinates(
         self,
@@ -395,10 +396,34 @@ def get_simcc_maximum(simcc_x: np.ndarray,
     locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
     max_val_x = np.amax(simcc_x, axis=1)
     max_val_y = np.amax(simcc_y, axis=1)
-    max_val_z = np.amax(simcc_z, axis=1)
-
-    vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
+    
+    mask = max_val_x > max_val_y
+    max_val_x[mask] = max_val_y[mask]
+    vals = max_val_x
     locs[vals <= 0.] = -1
+
+    # x_locs = np.argmax(simcc_x, axis=1)
+    # y_locs = np.argmax(simcc_y, axis=1)
+    # z_locs = np.argmax(simcc_z, axis=1)
+    # locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
+    # max_val_x = np.amax(simcc_x, axis=1)
+    # max_val_z = np.amax(simcc_z, axis=1)
+    
+    # mask = max_val_x > max_val_z
+    # max_val_x[mask] = max_val_z[mask]
+    # vals = max_val_x
+    # locs[vals <= 0.] = -1
+
+    # x_locs = np.argmax(simcc_x, axis=1)
+    # y_locs = np.argmax(simcc_y, axis=1)
+    # z_locs = np.argmax(simcc_z, axis=1)
+    # locs = np.stack((x_locs, y_locs, z_locs), axis=-1).astype(np.float32)
+    # max_val_x = np.amax(simcc_x, axis=1)
+    # max_val_y = np.amax(simcc_y, axis=1)
+    # max_val_z = np.amax(simcc_z, axis=1)
+
+    # vals = np.minimum(np.minimum(max_val_x, max_val_y), max_val_z)
+    # locs[vals <= 0.] = -1
 
     if n is not None:
         locs = locs.reshape(n, k, 3)

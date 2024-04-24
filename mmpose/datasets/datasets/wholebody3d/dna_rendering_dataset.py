@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os.path as osp
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -70,7 +71,23 @@ class DNARenderingDataset(BaseMocapDataset):
         for idx, ann in enumerate(self.ann_data):
             if idx % step != 0:
                 continue
+            
+            img_path = osp.join(self.data_root, ann['img_path'])
+            mask_path = osp.join(self.data_root, ann['mask'])
 
+            # # # part2
+            # instance_info = {
+            #     'img_path': img_path,
+            #     'keypoints': ann['keypoints'],
+            #     'keypoints_3d': ann['keypoints_3d'],
+            #     'keypoints_visible': ann['keypoints_visible'],
+            #     'bbox': ann['bbox'],
+            #     'bbox_score': ann['bbox_score'],
+            #     'cam_param': [ann['camera_param']],
+            #     'mask': mask_path
+            # }
+
+            # part1
             instance_info = {
                 'img_path': ann['img_path'],
                 'keypoints': ann['keypoints'],
@@ -78,7 +95,8 @@ class DNARenderingDataset(BaseMocapDataset):
                 'keypoints_visible': ann['keypoints_visible'],
                 'bbox': ann['bbox'],
                 'bbox_score': ann['bbox_score'],
-                'cam_param': [ann['camera_param']]
+                'cam_param': [ann['camera_param']],
+                'mask': ann['mask']
             }
 
             instance_list.append(instance_info)

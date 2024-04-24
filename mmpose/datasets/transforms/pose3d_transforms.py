@@ -5,9 +5,11 @@ from typing import Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-from mmcv.transforms import BaseTransform
+import mmcv
+from mmcv.transforms import BaseTransform, LoadImageFromFile
 from mmcv.transforms.utils import cache_randomness
 from mmengine.utils import scandir
+import mmengine.fileio as fileio
 
 from mmpose.registry import TRANSFORMS
 from mmpose.structures.keypoint import flip_keypoints_custom_center
@@ -606,6 +608,29 @@ class GetBBoxFromMask(BaseTransform):
         results.pop('mask')
         return results
 
+@TRANSFORMS.register_module()
+class LoadMask(LoadImageFromFile):
+
+    def transform(self, results):
+        filename = results['mask']
+        try:
+            if self.file_client_args is not None:
+                file_client = fileio.FileClient.infer_client(
+                    self.file_client_args, filename)
+                img_bytes = file_client.get(filename)
+            else:
+                img_bytes = fileio.get(
+                    filename, backend_args=self.backend_args)
+            mask = mmcv.imfrombytes(
+                img_bytes, flag='grayscale', backend=self.imdecode_backend)
+        except Exception as e:
+            if self.ignore_empty:
+                return None
+            else:
+                raise e
+        results['mask'] = mask
+        return results
+
 
 @TRANSFORMS.register_module()
 class RandomBackground(BaseTransform):
@@ -614,25 +639,33 @@ class RandomBackground(BaseTransform):
         self.bg_dir = bg_dir
         self.bg_prob = bg_prob
 
-        images = list(scandir(bg_dir, suffix=['.jpg', '.png']))
+        images = list(scandir(bg_dir, suffix=('.jpg', '.png')))
         self.image_paths = [osp.join(bg_dir, img) for img in images]
 
-    def transform(self, results: Dict) -> Dict | Tuple[List, List] | None:
-        assert 'mask' in results, 'mask is required for RandomBackground'
-
+    def transform(self, results):
+        if 'mask' not in results:
+            return results
+        
         if np.random.rand() > self.bg_prob:
             return results
 
-        mask = cv2.imread(results['mask'], cv2.IMREAD_GRAYSCALE)
+        mask = results['mask'].astype(np.float32)
         bg_path = np.random.choice(self.image_paths)
-        bg_img = cv2.imread(bg_path)
-        bg_img = cv2.resize(bg_img, (mask.shape[1], mask.shape[0]))
+        bg_img = cv2.imread(bg_path, cv2.IMREAD_UNCHANGED)  # 读取图像的原始深度
+        if bg_img.ndim != 3:
+            return results
+        # 确保mask是单通道的
+        mask = mask[..., None] / 255.0
+        mask = mask.astype(bg_img.dtype)  # 转换为与背景图像相同的数据类型
+        
+        bg_img = cv2.resize(bg_img, (mask.shape[1], mask.shape[0]))  # 调整背景图像大小以匹配mask的形状
 
+        # 确保前景图像和背景图像具有相同的数据类型
         img = results['img']
-
-        mask = mask[..., None] / 255
-        img = img * (1 - mask) + bg_img * mask
+        img = img.astype(bg_img.dtype)
+        
+        # 使用mask融合前景和背景图像
+        img = img * mask + bg_img * (1 - mask)
 
         results['img'] = img
-
         return results

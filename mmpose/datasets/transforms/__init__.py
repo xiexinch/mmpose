@@ -14,11 +14,13 @@ from .loading import LoadImage, LoadImageFromOSS2
 from .mix_img_transforms import Mosaic, YOLOXMixUp
 from .pose3d_transforms import (CoordCorrectionAndRandomRotate,
                                 GetBBoxFromMask, GlobalSkeletonTarget,
-                                RandomBackground, RandomDropInput,
+                                RandomBackground,
+                                RandomDropInput,
                                 RandomFlipAroundRoot, RandomHalfBody3D,
                                 RandomPerturb2DKeypoints,
                                 RandomPerturbScoreBalance,
-                                UpdateInstanceMappingLabel)
+                                UpdateInstanceMappingLabel,
+                                LoadMask)
 from .topdown_transforms import TopdownAffine
 
 __all__ = [
@@ -33,5 +35,5 @@ __all__ = [
     'CoordCorrectionAndRandomRotate', 'RandomHalfBody3D', 'RandomDropInput',
     'RandomPerturbScoreBalance', 'RandomPerturb2DKeypoints',
     'UpdateInstanceMappingLabel', 'KeypointCombiner', 'GetBBoxFromMask',
-    'RandomBackground', 'LoadImageFromOSS2'
+    'LoadImageFromOSS2', 'LoadMask'
 ]

@@ -190,7 +190,7 @@ class Pose3dLocalVisualizer(PoseLocalVisualizer):
                 z_c = np.mean(kpts_valid[:, 2]) if valid.any() else 0
 
                 ax.set_xlim3d([x_c - axis_limit / 2, x_c + axis_limit / 2])
-                ax.set_ylim3d([y_c - 1.7 / 2, y_c + 1.7 / 2])
+                ax.set_ylim3d([y_c - axis_limit / 2, y_c + axis_limit / 2])
                 ax.set_zlim3d(
                     [min(0, z_c - axis_limit / 2), z_c + axis_limit / 2])
 

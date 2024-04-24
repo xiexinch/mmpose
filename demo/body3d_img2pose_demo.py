@@ -250,7 +250,7 @@ def process_one_image(args, detector, frame: np.ndarray, frame_idx: int,
             draw_bbox=True,
             kpt_thr=args.kpt_thr,
             convert_keypoint=False,
-            axis_limit=300,
+            axis_limit=400,
             axis_azimuth=70,
             axis_elev=15,
             num_instances=args.num_instances,
@@ -285,7 +285,7 @@ def main():
     det_dataset_link_color = pose_estimator.dataset_meta.get(
         'skeleton_link_colors', None)
 
-    pose_estimator.cfg.model.test_cfg.mode = 'vis'
+    pose_estimator.cfg.model.test_cfg.mode = 'simcc'
     pose_estimator.cfg.visualizer.radius = args.radius
     pose_estimator.cfg.visualizer.line_width = args.thickness
     pose_estimator.cfg.visualizer.det_kpt_color = det_kpt_color
